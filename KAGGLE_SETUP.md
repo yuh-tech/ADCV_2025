@@ -43,7 +43,7 @@ In the right panel, click "Add data" and search for each dataset mentioned above
 In the first cell of your notebook:
 
 ```python
-!git clone https://github.com/YOUR_USERNAME/YOUR_REPO.git /kaggle/working/Final_exam
+!git clone https://github.com/yuh-tech/ADCV_2025 /kaggle/working/Final_exam
 %cd /kaggle/working/Final_exam
 ```
 
