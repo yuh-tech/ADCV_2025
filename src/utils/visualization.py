@@ -62,16 +62,20 @@ def denormalize_image(image, mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.22
     """
     # Convert torch.Tensor to numpy if needed
     if isinstance(image, torch.Tensor):
-        image = image.cpu().numpy()
+        image = image.detach().cpu().numpy()
+    
+    # Make a copy to avoid modifying original
+    image = image.copy()
     
     if image.shape[0] == 3:
         # Convert from (3, H, W) to (H, W, 3)
         image = np.transpose(image, (1, 2, 0))
     
-    mean = np.array(mean)
-    std = np.array(std)
+    mean = np.array(mean).reshape(1, 1, 3)
+    std = np.array(std).reshape(1, 1, 3)
     
-    image = image * std + mean
+    # Denormalize: x = (x_norm * std) + mean
+    image = (image * std) + mean
     image = np.clip(image, 0, 1)
     
     return image

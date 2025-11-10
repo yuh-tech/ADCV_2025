@@ -179,13 +179,30 @@ def find_reference_map(patch_id: str, reference_maps_folder: Union[str, Path]) -
     parts = patch_id.split('_')
     tile_name = '_'.join(parts[:-2])
     
-    # Construct reference map path
+    # Try standard path first
     ref_map_path = reference_maps_folder / tile_name / f"{patch_id}_reference_map.tif"
     
-    if not ref_map_path.exists():
-        raise FileNotFoundError(f"Reference map not found: {ref_map_path}")
+    if ref_map_path.exists():
+        return ref_map_path
     
-    return ref_map_path
+    # If not found, try searching recursively (for different extract structures)
+    ref_map_name = f"{patch_id}_reference_map.tif"
+    
+    # Search in parent folder
+    if reference_maps_folder.parent.exists():
+        candidates = list(reference_maps_folder.parent.rglob(ref_map_name))
+        if candidates:
+            logger.debug(f"Found reference map at alternative location: {candidates[0]}")
+            return candidates[0]
+    
+    # Search in reference_maps_folder itself
+    candidates = list(reference_maps_folder.rglob(ref_map_name))
+    if candidates:
+        logger.debug(f"Found reference map at: {candidates[0]}")
+        return candidates[0]
+    
+    raise FileNotFoundError(f"Reference map not found: {ref_map_path}")
+    
 
 
 def compute_class_weights(masks: list, num_classes: int, method: str = 'inverse_frequency') -> np.ndarray:

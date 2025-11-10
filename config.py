@@ -46,7 +46,11 @@ if IS_KAGGLE:
     # Reference Maps
     REFERENCE_MAPS_ARCHIVE = KAGGLE_INPUT / "bigearthnet-s2-referencesmap" / "Reference_Maps.tar.zst"
     # Extract to /kaggle/working/data/ directory
-    REFERENCE_MAPS_FOLDER = DATA_DIR / "Reference_Maps" / "Reference_Maps"
+    # After extraction: /kaggle/working/data/Reference_Maps/ (single level)
+    REFERENCE_MAPS_FOLDER = DATA_DIR / "Reference_Maps"
+    
+    print(f"  📍 Reference Maps: {REFERENCE_MAPS_FOLDER}")
+    print(f"     Exists: {REFERENCE_MAPS_FOLDER.exists()}")
     
     # BigEarthNet folders (multiple datasets: bigearthnetv2-s2-0 through bigearthnetv2-s2-5)
     BIGEARTHNET_FOLDERS = []
@@ -81,7 +85,7 @@ else:
     # Data paths
     METADATA_PATH = DATA_DIR / "metadata.parquet"
     REFERENCE_MAPS_ARCHIVE = DATA_DIR / "Reference_Maps.tar.zst"
-    REFERENCE_MAPS_FOLDER = DATA_DIR / "Reference_Maps" / "Reference_Maps"
+    REFERENCE_MAPS_FOLDER = DATA_DIR / "Reference_Maps"
     
     # BigEarthNet folders
     BIGEARTHNET_FOLDERS = [

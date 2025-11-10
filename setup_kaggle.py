@@ -53,8 +53,9 @@ def extract_reference_maps():
         print("  Make sure you've added 'bigearthnet-s2-referencesmap' dataset to your Kaggle notebook")
         return False
     
-    output_path = extract_dir / "Reference_Maps" / "Reference_Maps"
-    if output_path.exists():
+    # After extraction, reference maps will be at: /kaggle/working/data/Reference_Maps/
+    output_path = extract_dir / "Reference_Maps"
+    if output_path.exists() and any(output_path.iterdir()):
         print(f"✓ Reference maps already extracted at: {output_path}")
         return True
     

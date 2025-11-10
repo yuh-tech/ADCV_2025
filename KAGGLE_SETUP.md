@@ -114,7 +114,9 @@ The configuration automatically detects Kaggle environment and uses these paths:
 /kaggle/working/                                  # Writable workspace
 ├── Final_exam/                                   # Your cloned repo
 ├── data/                                         # Extracted data
-│   └── Reference_Maps/Reference_Maps/            # Extracted reference maps
+│   └── Reference_Maps/                           # Extracted reference 
+│       ├── S2A_MSIL2A_.../                       # Tile folders
+│       └── ...
 └── outputs/                                      # Training outputs
     ├── checkpoints/
     ├── logs/
