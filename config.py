@@ -7,15 +7,91 @@ import os
 from pathlib import Path
 
 # ============================================================================
+# ENVIRONMENT DETECTION
+# ============================================================================
+
+def is_kaggle_environment():
+    """Check if running on Kaggle."""
+    return os.path.exists('/kaggle/input')
+
+IS_KAGGLE = is_kaggle_environment()
+
+# ============================================================================
 # PROJECT PATHS
 # ============================================================================
 
 # Root directories
 PROJECT_ROOT = Path(__file__).parent
-DATA_DIR = PROJECT_ROOT / "data"
 NOTEBOOKS_DIR = PROJECT_ROOT / "notebooks"
 MODELS_DIR = PROJECT_ROOT / "models"
-OUTPUTS_DIR = PROJECT_ROOT / "outputs"
+
+if IS_KAGGLE:
+    # Kaggle environment
+    print("🌐 Running on Kaggle environment")
+    
+    # Data directories (read-only in Kaggle input)
+    KAGGLE_INPUT = Path("/kaggle/input")
+    
+    # Working directory for extracted/processed data
+    KAGGLE_WORKING = Path("/kaggle/working")
+    DATA_DIR = KAGGLE_WORKING / "data"
+    DATA_DIR.mkdir(parents=True, exist_ok=True)
+    
+    # Output directories
+    OUTPUTS_DIR = KAGGLE_WORKING / "outputs"
+    
+    # Metadata (read from input)
+    METADATA_PATH = KAGGLE_INPUT / "bigearthnet-s2-metadata" / "metadata.parquet"
+    
+    # Reference Maps
+    REFERENCE_MAPS_ARCHIVE = KAGGLE_INPUT / "bigearthnet-s2-referencesmap" / "Reference_Maps.tar.zst"
+    # Extract to /kaggle/working/data/ directory
+    REFERENCE_MAPS_FOLDER = DATA_DIR / "Reference_Maps" / "Reference_Maps"
+    
+    # BigEarthNet folders (multiple datasets: bigearthnetv2-s2-0 through bigearthnetv2-s2-5)
+    BIGEARTHNET_FOLDERS = []
+    for i in range(6):  # bigearthnetv2-s2-0 to bigearthnetv2-s2-5
+        folder = KAGGLE_INPUT / f"bigearthnetv2-s2-{i}" / "BigEarthNet-S2"
+        if folder.exists():
+            BIGEARTHNET_FOLDERS.append(folder)
+    
+    # If no numbered folders found, try single folder
+    if not BIGEARTHNET_FOLDERS:
+        single_folder = KAGGLE_INPUT / "bigearthnet-s2" / "BigEarthNet-S2"
+        if single_folder.exists():
+            BIGEARTHNET_FOLDERS.append(single_folder)
+    
+    # EuroSAT path
+    EUROSAT_PATH = KAGGLE_INPUT / "rgbeurosat" / "RBG"
+    if not EUROSAT_PATH.exists():
+        # Try alternative path
+        EUROSAT_PATH = KAGGLE_INPUT / "eurosat" / "RBG"
+    
+    print(f"  📁 Found {len(BIGEARTHNET_FOLDERS)} BigEarthNet folders")
+    print(f"  📍 Metadata: {METADATA_PATH.exists()}")
+    print(f"  📍 EuroSAT: {EUROSAT_PATH.exists()}")
+    
+else:
+    # Local environment
+    print("💻 Running on local environment")
+    
+    DATA_DIR = PROJECT_ROOT / "data"
+    OUTPUTS_DIR = PROJECT_ROOT / "outputs"
+    
+    # Data paths
+    METADATA_PATH = DATA_DIR / "metadata.parquet"
+    REFERENCE_MAPS_ARCHIVE = DATA_DIR / "Reference_Maps.tar.zst"
+    REFERENCE_MAPS_FOLDER = DATA_DIR / "Reference_Maps" / "Reference_Maps"
+    
+    # BigEarthNet folders
+    BIGEARTHNET_FOLDERS = [
+        DATA_DIR / "BigEarthNet-S2",
+    ]
+    
+    # EuroSAT path
+    EUROSAT_PATH = DATA_DIR / "rgbeurosat" / "RBG"
+
+# Common output directories
 CHECKPOINTS_DIR = OUTPUTS_DIR / "checkpoints"
 LOGS_DIR = OUTPUTS_DIR / "logs"
 VISUALIZATIONS_DIR = OUTPUTS_DIR / "visualizations"
@@ -23,19 +99,6 @@ VISUALIZATIONS_DIR = OUTPUTS_DIR / "visualizations"
 # Create directories if they don't exist
 for dir_path in [MODELS_DIR, OUTPUTS_DIR, CHECKPOINTS_DIR, LOGS_DIR, VISUALIZATIONS_DIR]:
     dir_path.mkdir(parents=True, exist_ok=True)
-
-# Data paths (adjust for your environment - Kaggle or local)
-METADATA_PATH = DATA_DIR / "metadata.parquet"
-REFERENCE_MAPS_ARCHIVE = DATA_DIR / "Reference_Maps.tar.zst"
-REFERENCE_MAPS_FOLDER = DATA_DIR / "Reference_Maps" / "Reference_Maps"
-
-# BigEarthNet folders (adjust based on your setup)
-BIGEARTHNET_FOLDERS = [
-    DATA_DIR / "BigEarthNet-S2",
-]
-
-# EuroSAT path (if available)
-EUROSAT_PATH = DATA_DIR / "rgbeurosat" / "RBG"
 
 # ============================================================================
 # DATASET CONFIGURATION

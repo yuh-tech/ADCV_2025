@@ -72,13 +72,32 @@ This project implements a **two-stage transfer learning approach** for semantic 
 
 ## 🚀 Getting Started
 
-### Prerequisites
+This project supports two environments:
+- 💻 **Local**: Train on your own machine with downloaded datasets
+- 🌐 **Kaggle**: Train using Kaggle notebooks with pre-uploaded datasets
+
+### For Kaggle Users
+
+**See [KAGGLE_SETUP.md](KAGGLE_SETUP.md) for detailed Kaggle instructions.**
+
+Quick start on Kaggle:
+```python
+!git clone https://github.com/YOUR_REPO.git /kaggle/working/Final_exam
+%cd /kaggle/working/Final_exam
+!pip install -q -r requirements.txt
+!python setup_kaggle.py  # Setup and verify datasets
+!python train_stage1.py --epochs 50
+```
+
+### For Local Users
+
+#### Prerequisites
 
 - Python 3.8+
 - CUDA-capable GPU (recommended)
 - 16GB+ RAM
 
-### Installation
+#### Installation
 
 1. Clone the repository:
 ```bash
@@ -97,7 +116,9 @@ source venv/bin/activate  # On Windows: venv\Scripts\activate
 pip install -r requirements.txt
 ```
 
-### Dataset Setup
+### Dataset Setup (Local Only)
+
+> **Note**: If using Kaggle, skip this section and see [KAGGLE_SETUP.md](KAGGLE_SETUP.md)
 
 #### 1. Download Datasets
 
@@ -144,10 +165,15 @@ data/
 
 ## 📖 Usage
 
+> **Environment Detection**: The code automatically detects if running on Kaggle or local and adjusts paths accordingly. No manual configuration needed!
+
 ### Configuration
 
-Edit `config.py` to adjust:
-- Dataset paths
+The project automatically configures paths based on your environment:
+- **Kaggle**: Uses `/kaggle/input/` for datasets, `/kaggle/working/` for outputs
+- **Local**: Uses `data/` for datasets, `outputs/` for results
+
+To customize training parameters, edit `config.py`:
 - Model architecture
 - Hyperparameters
 - Training settings
@@ -156,8 +182,14 @@ Edit `config.py` to adjust:
 
 Train the encoder on EuroSAT for classification:
 
+**Local:**
 ```bash
 python train_stage1.py
+```
+
+**Kaggle:**
+```python
+!python train_stage1.py --epochs 50
 ```
 
 **Optional arguments:**
@@ -179,8 +211,14 @@ python train_stage1.py \
 
 Train U-Net on BigEarthNet for segmentation:
 
+**Local:**
 ```bash
 python train_stage2.py
+```
+
+**Kaggle:**
+```python
+!python train_stage2.py --epochs 50 --batch-size 16
 ```
 
 **Optional arguments:**
