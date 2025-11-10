@@ -38,7 +38,7 @@ ENV/
 *.ipynb_checkpoints
 
 # Data
-data/
+/data/
 !data/.gitkeep
 *.parquet
 *.tif
