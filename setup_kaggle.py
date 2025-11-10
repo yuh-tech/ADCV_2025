@@ -6,6 +6,38 @@ Run this after cloning the repo to Kaggle to extract and prepare data
 import subprocess
 from pathlib import Path
 import sys
+def ensure_zstd_installed():
+    """Ensure zstd is installed on Kaggle for reference maps extraction."""
+    import subprocess
+    import shutil
+    
+    # Check if zstd is already available
+    if shutil.which('zstd'):
+        print("✓ zstd is already installed")
+        return True
+    
+    print("⚙ Installing zstd...")
+    try:
+        # Update apt
+        subprocess.run(['apt-get', 'update', '-qq'], 
+                      check=True, 
+                      stdout=subprocess.DEVNULL, 
+                      stderr=subprocess.DEVNULL)
+        
+        # Install zstd
+        subprocess.run(['apt-get', 'install', '-y', '-qq', 'zstd'], 
+                      check=True,
+                      stdout=subprocess.DEVNULL, 
+                      stderr=subprocess.DEVNULL)
+        
+        print("✓ zstd installed successfully")
+        return True
+    except subprocess.CalledProcessError as e:
+        print(f"✗ Failed to install zstd: {e}")
+        return False
+    except Exception as e:
+        print(f"✗ Error installing zstd: {e}")
+        return False
 
 def extract_reference_maps():
     """Extract reference maps on Kaggle."""
@@ -125,6 +157,12 @@ def setup_environment():
         sys.exit(1)
     
     print("✓ Running on Kaggle")
+    
+    # Ensure zstd is installed
+    zstd_ok = ensure_zstd_installed()
+    if not zstd_ok:
+        print("\n⚠ Failed to install zstd. Reference maps extraction will fail.")
+        sys.exit(1)
     
     # Check datasets
     datasets_ok = check_kaggle_datasets()
