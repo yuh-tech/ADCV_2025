@@ -62,22 +62,12 @@ This project implements a **two-stage transfer learning approach** for semantic 
 │       ├── logger.py         # Logging setup
 │       └── trainer.py        # Training utilities
 │
-├── notebooks/
-│   └── dataloader.ipynb      # Data exploration notebook
 │
-├── data/                     # Data directory (not in repo)
-│   ├── metadata.parquet
-│   ├── Reference_Maps/
-│   ├── BigEarthNet-S2/
-│   └── rgbeurosat/
 │
 ├── outputs/                  # Output directory (created during training)
 │   ├── checkpoints/
 │   ├── logs/
 │   └── visualizations/
-│
-└── references/
-    └── project-summary-doc.md
 ```
 
 ## 🚀 Getting Started
