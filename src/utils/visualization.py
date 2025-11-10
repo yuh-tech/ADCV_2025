@@ -48,18 +48,22 @@ def mask_to_rgb(mask: np.ndarray, color_palette: np.ndarray = COLOR_PALETTE) -> 
     return rgb
 
 
-def denormalize_image(image: np.ndarray, mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]) -> np.ndarray:
+def denormalize_image(image, mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]) -> np.ndarray:
     """
     Denormalize image from ImageNet normalization.
     
     Args:
-        image: Normalized image (3, H, W) or (H, W, 3)
+        image: Normalized image (3, H, W) or (H, W, 3) - torch.Tensor or np.ndarray
         mean: Mean values used for normalization
         std: Std values used for normalization
         
     Returns:
-        Denormalized image in [0, 1] range
+        Denormalized image in [0, 1] range as numpy array with shape (H, W, 3)
     """
+    # Convert torch.Tensor to numpy if needed
+    if isinstance(image, torch.Tensor):
+        image = image.cpu().numpy()
+    
     if image.shape[0] == 3:
         # Convert from (3, H, W) to (H, W, 3)
         image = np.transpose(image, (1, 2, 0))
