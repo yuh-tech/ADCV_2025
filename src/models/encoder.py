@@ -117,11 +117,19 @@ class EncoderClassifier(nn.Module):
             Logits of shape (batch_size, num_classes)
         """
         # Extract features
-        features = self.encoder(x)  # (batch_size, feature_dim, H', W')
+        features = self.encoder(x)
         
-        # Global average pooling
-        features = self.global_pool(features)  # (batch_size, feature_dim, 1, 1)
-        features = features.flatten(1)  # (batch_size, feature_dim)
+        # Handle encoders that already include global pooling internally
+        if features.dim() == 4:
+            features = self.global_pool(features)
+            features = features.flatten(1)
+        elif features.dim() == 2:
+            # Already pooled/flattened by the backbone
+            pass
+        else:
+            raise ValueError(
+                f"Unexpected encoder output shape {features.shape} from {self.encoder_name}"
+            )
         
         # Classification
         logits = self.classifier(features)  # (batch_size, num_classes)
