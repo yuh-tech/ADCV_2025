@@ -9,6 +9,7 @@ from torch.cuda.amp import autocast, GradScaler
 from pathlib import Path
 from typing import Optional, Dict, Callable
 import logging
+import pickle
 from tqdm import tqdm
 import time
 
@@ -387,7 +388,11 @@ class Trainer:
             checkpoint_path: Path to checkpoint file
             load_optimizer: Whether to load optimizer state
         """
-        checkpoint = torch.load(checkpoint_path, map_location=self.device)
+        try:
+            checkpoint = torch.load(checkpoint_path, map_location=self.device)
+        except (RuntimeError, pickle.UnpicklingError):
+            # PyTorch 2.6 sets weights_only=True by default; fall back to full loading
+            checkpoint = torch.load(checkpoint_path, map_location=self.device, weights_only=False)
         
         self.model.load_state_dict(checkpoint['model_state_dict'])
         
