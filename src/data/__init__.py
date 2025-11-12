@@ -1,7 +1,13 @@
 """Data loading and preprocessing modules"""
 
-from .bigearthnet_dataset import BigEarthNetSegmentationDataset
-from .eurosat_dataset import EuroSATDataset
+from .bigearthnet_dataset import (
+    BigEarthNetSegmentationDataset,
+    create_bigearthnet_dataloaders,
+)
+from .eurosat_dataset import (
+    EuroSATDataset,
+    create_eurosat_dataloaders,
+)
 from .augmentations import (
     get_train_augmentation, 
     get_val_augmentation,
@@ -20,5 +26,7 @@ __all__ = [
     'load_reference_map',
     'get_classification_train_augmentation',
     'get_segmentation_train_augmentation',
+    'create_eurosat_dataloaders',
+    'create_bigearthnet_dataloaders',
 ]
 

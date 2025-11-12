@@ -202,8 +202,6 @@ def find_reference_map(patch_id: str, reference_maps_folder: Union[str, Path]) -
         return candidates[0]
     
     raise FileNotFoundError(f"Reference map not found: {ref_map_path}")
-    
-
 
 def compute_class_weights(masks: list, num_classes: int, method: str = 'inverse_frequency') -> np.ndarray:
     """
