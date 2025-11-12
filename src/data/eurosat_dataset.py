@@ -73,17 +73,17 @@ class EuroSATDataset(Dataset):
         """
         image, label = self.dataset[idx]
         
-        # Convert PIL image to numpy array
+        # Convert PIL image to numpy array without normalizing
         if isinstance(image, Image.Image):
-            image = np.array(image).astype(np.float32) / 255.0
+            image = np.array(image)
         
         # Apply transform
         if self.transform:
             transformed = self.transform(image=image)
             image = transformed['image']
         else:
-            # Convert to tensor
-            image = torch.from_numpy(image).permute(2, 0, 1).float()
+            # Convert to tensor and normalize to [0, 1]
+            image = torch.from_numpy(image).permute(2, 0, 1).float() / 255.0
         
         return {
             'image': image,

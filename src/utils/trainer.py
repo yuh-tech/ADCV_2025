@@ -71,7 +71,10 @@ class Trainer:
         }
         
         # Best metrics for checkpointing
-        self.best_metric = float('inf') if task == 'classification' else 0.0
+        if task == 'classification':
+            self.best_metric = float('-inf')
+        else:
+            self.best_metric = 0.0
         self.best_epoch = 0
         
         logger.info(f"Initialized Trainer:")
