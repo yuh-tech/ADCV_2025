@@ -267,4 +267,3 @@ class UNetWithPretrainedEncoder(nn.Module):
             if not name.startswith('encoder.'):
                 decoder_params.append(param)
         return decoder_params
-
