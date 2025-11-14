@@ -464,6 +464,9 @@ class SegNetTransposedDecoder(nn.Module):
         
         # Final classification
         x = self.final_conv(x)
+
+        # ---- Thêm dòng này để upsample về đúng kích thước input ----
+        x = F.interpolate(x, scale_factor=2, mode='bilinear', align_corners=False)
         
         return x
 
