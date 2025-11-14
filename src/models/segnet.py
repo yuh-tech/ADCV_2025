@@ -490,5 +490,17 @@ class SegNetTransposedDecoder(nn.Module):
         # Final classification
         x = self.final_conv(x)
         
+        # If output size doesn't match input, interpolate to match
+        # This handles cases where input size is not divisible by 32
+        # With ResNet: features_list[0] is after layer0 (conv1+bn1+relu with stride=2)
+        # So features_list[0] is at 1/2 resolution, input is 2x that
+        if features_list and len(features_list) > 0:
+            # features_list[0] is after layer0 (conv1 with stride=2), so it's at 1/2 resolution
+            # Input size is 2x features_list[0] size
+            target_h = features_list[0].shape[2] * 2
+            target_w = features_list[0].shape[3] * 2
+            if x.shape[2] != target_h or x.shape[3] != target_w:
+                x = F.interpolate(x, size=(target_h, target_w), mode='bilinear', align_corners=False)
+        
         return x
 
