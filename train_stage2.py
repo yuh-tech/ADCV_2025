@@ -22,7 +22,8 @@ from src.data import (
     get_segmentation_train_augmentation,
     get_val_augmentation
 )
-from src.models import UNetWithPretrainedEncoder, create_loss_function
+from src.models.unet_pp import UNetPlusPlusWithPretrainedEncoder
+from src.models.losses import create_loss_function
 from src.utils import (
     setup_logger,
     SegmentationMetrics,
@@ -170,14 +171,16 @@ def main(args):
             logger.warning("Will use ImageNet pre-trained weights instead")
             encoder_weights_path = None
     
-    model = UNetWithPretrainedEncoder(
+    model = UNetPlusPlusWithPretrainedEncoder(
         encoder_name=STAGE2_CONFIG['encoder_name'],
         num_classes=NUM_CLASSES,
         encoder_pretrained=(STAGE2_CONFIG['encoder_weights'] == 'imagenet'),
         encoder_weights_path=encoder_weights_path,
         dropout=0.1,
-        freeze_encoder=(STAGE2_CONFIG['freeze_encoder_epochs'] > 0)
-    )
+        freeze_encoder=(STAGE2_CONFIG['freeze_encoder_epochs'] > 0),
+        deep_supervision=False 
+    )   
+
     
     # Count parameters
     total_params = sum(p.numel() for p in model.parameters())

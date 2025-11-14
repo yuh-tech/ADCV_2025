@@ -327,3 +327,15 @@ class UNetPlusPlusWithPretrainedEncoder(nn.Module):
             logger.warning(f"Unexpected keys: {unexpected_keys}")
         
         logger.info(f"Loaded encoder weights from {weights_path}")
+
+    def get_encoder_parameters(self):
+        """Return encoder parameters for optimizer."""
+        return self.encoder.parameters()
+
+    def get_decoder_parameters(self):
+        """Return all decoder parameters (everything except encoder)."""
+        decoder_params = []
+        for name, param in self.named_parameters():
+            if not name.startswith("encoder."):
+                decoder_params.append(param)
+        return decoder_params

@@ -8,8 +8,8 @@ from .losses import CombinedLoss, DiceLoss, FocalLoss
 __all__ = [
     'EncoderClassifier',
     'create_encoder',
-    'UNet',
-    'UNetWithPretrainedEncoder',
+    # 'UNet',
+    # 'UNetWithPretrainedEncoder',
     'CombinedLoss',
     'DiceLoss',
     'FocalLoss',
