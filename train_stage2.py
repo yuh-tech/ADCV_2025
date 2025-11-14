@@ -15,7 +15,8 @@ from config import (
     METADATA_PATH, BIGEARTHNET_FOLDERS, REFERENCE_MAPS_FOLDER,
     CHECKPOINTS_DIR, LOGS_DIR, VISUALIZATIONS_DIR,
     STAGE2_CONFIG, DATALOADER_CONFIG, CLASS_NAMES, NUM_CLASSES,
-    CORINE_TO_EUROSAT, DEVICE, SEED
+    CORINE_TO_EUROSAT, DEVICE, SEED,
+    PRETRAINED_ENCODER_PATH, IS_KAGGLE
 )
 from src.data import (
     create_bigearthnet_dataloaders,
@@ -164,8 +165,15 @@ def main(args):
     # Determine encoder weights source
     encoder_weights_path = None
     if STAGE2_CONFIG['encoder_weights'] == 'stage1':
-        encoder_weights_path = CHECKPOINTS_DIR / 'stage1' / 'encoder_pretrained.pth'
-        if not encoder_weights_path.exists():
+        # Use pretrained encoder path from config (supports both Kaggle and local)
+        if args.pretrained_encoder_path:
+            encoder_weights_path = Path(args.pretrained_encoder_path)
+        else:
+            encoder_weights_path = PRETRAINED_ENCODER_PATH
+            
+        if encoder_weights_path and encoder_weights_path.exists():
+            logger.info(f"Loading pretrained encoder from: {encoder_weights_path}")
+        else:
             logger.warning(f"Pre-trained encoder not found at {encoder_weights_path}")
             logger.warning("Will use ImageNet pre-trained weights instead")
             encoder_weights_path = None
@@ -338,6 +346,10 @@ if __name__ == '__main__':
     parser.add_argument('--encoder-lr', type=float, help='Encoder learning rate')
     parser.add_argument('--decoder-lr', type=float, help='Decoder learning rate')
     parser.add_argument('--freeze-epochs', type=int, help='Epochs to freeze encoder')
+    parser.add_argument('--pretrained-encoder-path', type=str, 
+                        help='Path to pretrained encoder weights (default: use config path)')
+    parser.add_argument('--use-imagenet', action='store_true',
+                        help='Use ImageNet pretrained weights instead of Stage 1 weights')
     
     args = parser.parse_args()
     
@@ -352,6 +364,8 @@ if __name__ == '__main__':
         STAGE2_CONFIG['decoder_lr'] = args.decoder_lr
     if args.freeze_epochs is not None:
         STAGE2_CONFIG['freeze_encoder_epochs'] = args.freeze_epochs
+    if args.use_imagenet:
+        STAGE2_CONFIG['encoder_weights'] = 'imagenet'
     
     main(args)
 
