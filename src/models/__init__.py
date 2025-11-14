@@ -9,10 +9,11 @@ __all__ = [
     'EncoderClassifier',
     'create_encoder',
     'UNet',
-    'UNetPP',
     'UNetWithPretrainedEncoder',
     'CombinedLoss',
     'DiceLoss',
     'FocalLoss',
+    'UNetPlusPlus',
+    'UNetPlusPlusWithPretrainedEncoder',
 ]
 
