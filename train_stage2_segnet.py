@@ -3,6 +3,9 @@ Stage 2: Train SegNet with BigEarthNet for Semantic Segmentation
 
 This script trains a SegNet model with pre-trained encoder from Stage 1
 on the BigEarthNet dataset for semantic segmentation.
+
+IMPORTANT: This script uses SegNet architecture from src/models/segnet.py
+Specifically: SegNetWithPretrainedEncoder class
 """
 
 import torch
@@ -22,6 +25,7 @@ from src.data import (
     get_segmentation_train_augmentation,
     get_val_augmentation
 )
+# Import SegNet model from segnet.py
 from src.models.segnet import SegNetWithPretrainedEncoder
 from src.models.losses import create_loss_function
 from src.utils import (
