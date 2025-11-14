@@ -71,9 +71,15 @@ if IS_KAGGLE:
         # Try alternative path
         EUROSAT_PATH = KAGGLE_INPUT / "eurosat" / "RBG"
     
+    # Pretrained weights from Kaggle input (uploaded from Stage 1 training)
+    STAGE1_WEIGHTS_DIR = KAGGLE_INPUT / "model-weight-stage-1" / "stage1"
+    PRETRAINED_ENCODER_PATH = STAGE1_WEIGHTS_DIR / "encoder_pretrained.pth"
+    STAGE1_BEST_MODEL_PATH = STAGE1_WEIGHTS_DIR / "best_model.pth"
+    
     print(f"  📁 Found {len(BIGEARTHNET_FOLDERS)} BigEarthNet folders")
     print(f"  📍 Metadata: {METADATA_PATH.exists()}")
     print(f"  📍 EuroSAT: {EUROSAT_PATH.exists()}")
+    print(f"  📍 Pretrained Encoder: {PRETRAINED_ENCODER_PATH.exists() if PRETRAINED_ENCODER_PATH else False}")
     
 else:
     # Local environment
@@ -94,6 +100,11 @@ else:
     
     # EuroSAT path
     EUROSAT_PATH = DATA_DIR / "rgbeurosat" / "RBG"
+    
+    # Pretrained weights from local training
+    STAGE1_WEIGHTS_DIR = OUTPUTS_DIR / "stage1"
+    PRETRAINED_ENCODER_PATH = STAGE1_WEIGHTS_DIR / "encoder_pretrained.pth"
+    STAGE1_BEST_MODEL_PATH = STAGE1_WEIGHTS_DIR / "best_model.pth"
 
 # Common output directories
 CHECKPOINTS_DIR = OUTPUTS_DIR / "checkpoints"
