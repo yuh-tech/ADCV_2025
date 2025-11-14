@@ -82,35 +82,35 @@ class SegNetEncoder(nn.Module):
         # Encoder Block 1
         x = F.relu(self.bn1_1(self.enc1_1(x)))
         x = F.relu(self.bn1_2(self.enc1_2(x)))
+        size1 = x.size()  # Size before pooling
         x, indices1 = self.pool1(x)
-        size1 = x.size()
         
         # Encoder Block 2
         x = F.relu(self.bn2_1(self.enc2_1(x)))
         x = F.relu(self.bn2_2(self.enc2_2(x)))
+        size2 = x.size()  # Size before pooling
         x, indices2 = self.pool2(x)
-        size2 = x.size()
         
         # Encoder Block 3
         x = F.relu(self.bn3_1(self.enc3_1(x)))
         x = F.relu(self.bn3_2(self.enc3_2(x)))
         x = F.relu(self.bn3_3(self.enc3_3(x)))
+        size3 = x.size()  # Size before pooling
         x, indices3 = self.pool3(x)
-        size3 = x.size()
         
         # Encoder Block 4
         x = F.relu(self.bn4_1(self.enc4_1(x)))
         x = F.relu(self.bn4_2(self.enc4_2(x)))
         x = F.relu(self.bn4_3(self.enc4_3(x)))
+        size4 = x.size()  # Size before pooling
         x, indices4 = self.pool4(x)
-        size4 = x.size()
         
         # Encoder Block 5
         x = F.relu(self.bn5_1(self.enc5_1(x)))
         x = F.relu(self.bn5_2(self.enc5_2(x)))
         x = F.relu(self.bn5_3(self.enc5_3(x)))
+        size5 = x.size()  # Size before pooling
         x, indices5 = self.pool5(x)
-        size5 = x.size()
         
         return x, [indices1, indices2, indices3, indices4, indices5], [size1, size2, size3, size4, size5]
 
@@ -183,31 +183,56 @@ class SegNetDecoder(nn.Module):
             indices_list: List of pooling indices from encoder [indices1, ..., indices5]
             sizes_list: List of feature sizes before pooling [size1, ..., size5]
         """
+        # Helper function to extract [H, W] from torch.Size
+        def get_hw(size):
+            if isinstance(size, torch.Size):
+                if len(size) == 4:
+                    return (int(size[2]), int(size[3]))
+                elif len(size) == 2:
+                    return (int(size[0]), int(size[1]))
+                else:
+                    return (int(size[-2]), int(size[-1]))
+            elif isinstance(size, (list, tuple)):
+                if len(size) == 4:
+                    return (int(size[2]), int(size[3]))
+                elif len(size) == 2:
+                    return (int(size[0]), int(size[1]))
+                else:
+                    return (int(size[-2]), int(size[-1]))
+            else:
+                return size
+        
         # Decoder Block 5
-        x = self.unpool5(x, indices_list[4])
+        # output_size must match the size of the tensor that generated the indices
+        output_size5 = get_hw(sizes_list[4])
+        x = self.unpool5(x, indices_list[4], output_size=output_size5)
         x = F.relu(self.bn5_3(self.dec5_3(x)))
         x = F.relu(self.bn5_2(self.dec5_2(x)))
         x = F.relu(self.bn5_1(self.dec5_1(x)))
         
         # Decoder Block 4
-        x = self.unpool4(x, indices_list[3])
+        output_size4 = get_hw(sizes_list[3])
+        x = self.unpool4(x, indices_list[3], output_size=output_size4)
         x = F.relu(self.bn4_3(self.dec4_3(x)))
         x = F.relu(self.bn4_2(self.dec4_2(x)))
         x = F.relu(self.bn4_1(self.dec4_1(x)))
         
         # Decoder Block 3
-        x = self.unpool3(x, indices_list[2])
+        output_size3 = get_hw(sizes_list[2])
+        x = self.unpool3(x, indices_list[2], output_size=output_size3)
         x = F.relu(self.bn3_3(self.dec3_3(x)))
         x = F.relu(self.bn3_2(self.dec3_2(x)))
         x = F.relu(self.bn3_1(self.dec3_1(x)))
         
         # Decoder Block 2
-        x = self.unpool2(x, indices_list[1])
+        output_size2 = get_hw(sizes_list[1])
+        x = self.unpool2(x, indices_list[1], output_size=output_size2)
         x = F.relu(self.bn2_2(self.dec2_2(x)))
         x = F.relu(self.bn2_1(self.dec2_1(x)))
         
         # Decoder Block 1
-        x = self.unpool1(x, indices_list[0])
+        output_size1 = get_hw(sizes_list[0])
+        x = self.unpool1(x, indices_list[0], output_size=output_size1)
         x = F.relu(self.bn1_2(self.dec1_2(x)))
         x = self.dec1_1(x)  # No activation, will apply softmax in loss
         
@@ -464,9 +489,6 @@ class SegNetTransposedDecoder(nn.Module):
         
         # Final classification
         x = self.final_conv(x)
-
-        # ---- Thêm dòng này để upsample về đúng kích thước input ----
-        x = F.interpolate(x, scale_factor=2, mode='bilinear', align_corners=False)
         
         return x
 
