@@ -114,7 +114,7 @@ class Trainer:
             images = batch['image'].to(self.device)
             
             if self.task == 'segmentation':
-                targets = batch['mask'].to(self.device)
+                targets = batch['mask'].to(self.device).long()  # Ensure Long dtype for cross-entropy
             else:  # classification
                 targets = batch['label'].to(self.device)
             
@@ -201,7 +201,7 @@ class Trainer:
             images = batch['image'].to(self.device)
             
             if self.task == 'segmentation':
-                targets = batch['mask'].to(self.device)
+                targets = batch['mask'].to(self.device).long()  # Ensure Long dtype for cross-entropy
             else:  # classification
                 targets = batch['label'].to(self.device)
             

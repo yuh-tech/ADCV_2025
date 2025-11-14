@@ -380,8 +380,23 @@ class SegNetWithPretrainedEncoder(nn.Module):
         else:
             state_dict = checkpoint
         
+        # Map ResNet standard format to FeatureExtractor format
+        # Stage 1 uses standard ResNet (conv1, bn1, layer1, etc.)
+        # Stage 2 uses FeatureExtractor (layer0, layer1, etc.)
+        mapped_state_dict = {}
+        for key, value in state_dict.items():
+            new_key = key
+            # Map conv1, bn1 to layer0
+            if key.startswith('conv1.'):
+                new_key = key.replace('conv1.', 'layer0.0.')
+            elif key.startswith('bn1.'):
+                new_key = key.replace('bn1.', 'layer0.1.')
+            # layer1, layer2, layer3, layer4 remain the same
+            # But need to check if they're already in the right format
+            mapped_state_dict[new_key] = value
+        
         # Load weights
-        missing_keys, unexpected_keys = self.encoder.load_state_dict(state_dict, strict=False)
+        missing_keys, unexpected_keys = self.encoder.load_state_dict(mapped_state_dict, strict=False)
         
         if missing_keys:
             logger.warning(f"Missing keys when loading encoder: {missing_keys}")
