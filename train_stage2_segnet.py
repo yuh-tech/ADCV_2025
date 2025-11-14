@@ -109,8 +109,14 @@ def create_scheduler(optimizer, config):
     return scheduler
 
 
-def main(args):
+def main(args=None):
     """Main training function."""
+    if args is None:
+        # Create default args if not provided
+        class DefaultArgs:
+            max_samples = None
+            num_workers = None
+        args = DefaultArgs()
     
     # Setup logging
     log_file = LOGS_DIR / 'stage2_segnet_training.log'
@@ -146,6 +152,9 @@ def main(args):
     # Create dataloaders
     logger.info("Loading BigEarthNet dataset...")
     try:
+        # Use custom num_workers if provided, otherwise use config default
+        num_workers = args.num_workers if args.num_workers is not None else DATALOADER_CONFIG['num_workers']
+        
         train_loader, val_loader, test_loader = create_bigearthnet_dataloaders(
             metadata_path=METADATA_PATH,
             data_folders=BIGEARTHNET_FOLDERS,
@@ -154,9 +163,10 @@ def main(args):
             train_transform=train_transform,
             val_transform=val_transform,
             batch_size=STAGE2_CONFIG['batch_size'],
-            num_workers=DATALOADER_CONFIG['num_workers'],
+            num_workers=num_workers,
             pin_memory=DATALOADER_CONFIG['pin_memory'],
-            num_classes=NUM_CLASSES
+            num_classes=NUM_CLASSES,
+            max_train_samples=args.max_samples  # Limit training samples for faster training
         )
     except Exception as e:
         logger.error(f"Error loading BigEarthNet dataset: {e}")
@@ -343,6 +353,10 @@ if __name__ == '__main__':
     parser.add_argument('--encoder-lr', type=float, help='Encoder learning rate')
     parser.add_argument('--decoder-lr', type=float, help='Decoder learning rate')
     parser.add_argument('--freeze-epochs', type=int, help='Epochs to freeze encoder')
+    parser.add_argument('--max-samples', type=int, default=None,
+                        help='Maximum number of training samples (for faster testing, None = use all)')
+    parser.add_argument('--num-workers', type=int, default=None,
+                        help='Number of data loading workers (None = use config default)')
     
     args = parser.parse_args()
     

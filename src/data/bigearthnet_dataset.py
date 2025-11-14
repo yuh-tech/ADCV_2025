@@ -206,7 +206,8 @@ def create_bigearthnet_dataloaders(
     batch_size: int,
     num_workers: int = 4,
     pin_memory: bool = True,
-    num_classes: int = 10
+    num_classes: int = 10,
+    max_train_samples: Optional[int] = None
 ):
     """
     Create train, validation, and test dataloaders for BigEarthNet.
@@ -234,6 +235,12 @@ def create_bigearthnet_dataloaders(
     train_df = metadata_df[metadata_df['split'] == 'train'].reset_index(drop=True)
     val_df = metadata_df[metadata_df['split'] == 'validation'].reset_index(drop=True)
     test_df = metadata_df[metadata_df['split'] == 'test'].reset_index(drop=True)
+    
+    # Limit training samples if specified (for faster training/testing)
+    if max_train_samples is not None and max_train_samples > 0:
+        if len(train_df) > max_train_samples:
+            logger.info(f"Limiting training samples from {len(train_df)} to {max_train_samples} for faster training")
+            train_df = train_df.head(max_train_samples).reset_index(drop=True)
     
     logger.info(f"Train samples: {len(train_df)}")
     logger.info(f"Validation samples: {len(val_df)}")
