@@ -184,30 +184,30 @@ class SegNetDecoder(nn.Module):
             sizes_list: List of feature sizes before pooling [size1, ..., size5]
         """
         # Decoder Block 5
-        x = self.unpool5(x, indices_list[4], output_size=sizes_list[4])
+        x = self.unpool5(x, indices_list[4])
         x = F.relu(self.bn5_3(self.dec5_3(x)))
         x = F.relu(self.bn5_2(self.dec5_2(x)))
         x = F.relu(self.bn5_1(self.dec5_1(x)))
         
         # Decoder Block 4
-        x = self.unpool4(x, indices_list[3], output_size=sizes_list[3])
+        x = self.unpool4(x, indices_list[3])
         x = F.relu(self.bn4_3(self.dec4_3(x)))
         x = F.relu(self.bn4_2(self.dec4_2(x)))
         x = F.relu(self.bn4_1(self.dec4_1(x)))
         
         # Decoder Block 3
-        x = self.unpool3(x, indices_list[2], output_size=sizes_list[2])
+        x = self.unpool3(x, indices_list[2])
         x = F.relu(self.bn3_3(self.dec3_3(x)))
         x = F.relu(self.bn3_2(self.dec3_2(x)))
         x = F.relu(self.bn3_1(self.dec3_1(x)))
         
         # Decoder Block 2
-        x = self.unpool2(x, indices_list[1], output_size=sizes_list[1])
+        x = self.unpool2(x, indices_list[1])
         x = F.relu(self.bn2_2(self.dec2_2(x)))
         x = F.relu(self.bn2_1(self.dec2_1(x)))
         
         # Decoder Block 1
-        x = self.unpool1(x, indices_list[0], output_size=sizes_list[0])
+        x = self.unpool1(x, indices_list[0])
         x = F.relu(self.bn1_2(self.dec1_2(x)))
         x = self.dec1_1(x)  # No activation, will apply softmax in loss
         
