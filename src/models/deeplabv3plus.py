@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from torchvision.models import mobilenet_v3_large
+from torchvision.models import mobilenet_v2
 
 
 # ---------------------------
@@ -91,7 +91,7 @@ class DeepLabV3Plus(nn.Module):
     def __init__(self, num_classes=21, pretrained=True):
         super().__init__()
 
-        backbone = mobilenet_v3_large(pretrained=pretrained)
+        backbone = mobilenet_v2(pretrained=pretrained)
 
         self.low_level = backbone.features[0:3]     # stride /4
         self.high_level = backbone.features[3:]     # stride /16
