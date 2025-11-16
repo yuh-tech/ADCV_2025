@@ -142,7 +142,7 @@ class BigEarthNetSegmentationDataset(Dataset):
             return sample
             
         except Exception as e:
-            logger.error(f"Error loading sample {idx} (patch_id: {patch_id}): {e}")
+            # logger.error(f"Error loading sample {idx} (patch_id: {patch_id}): {e}")
             self.failed_samples.append((idx, patch_id, str(e)))
             
             # Return a dummy sample to avoid breaking the training loop
