@@ -208,7 +208,7 @@ RGB_BANDS = {
 # ============================================================================
 
 STAGE1_CONFIG = {
-    'model_name': 'resnet50',  # Options: 'resnet18', 'resnet50', 'efficientnet_b0', etc.
+    'model_name': 'mobilenet_v2',  # Options: 'resnet18', 'resnet50', 'efficientnet_b0', etc.
     'pretrained': True,  # Use ImageNet pretrained weights
     'input_size': EUROSAT_IMAGE_SIZE,
     'num_classes': NUM_CLASSES,
@@ -243,7 +243,7 @@ STAGE1_CONFIG = {
 # ============================================================================
 
 STAGE2_CONFIG = {
-    'encoder_name': 'resnet50',  # Must match Stage 1
+    'encoder_name': 'mobilenet_v2',  # Must match Stage 1
     'encoder_weights': 'stage1',  # Options: 'stage1', 'imagenet', None
     'input_size': BIGEARTHNET_IMAGE_SIZE,
     'num_classes': NUM_CLASSES,
