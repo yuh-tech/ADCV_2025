@@ -182,12 +182,9 @@ def main(args=None):
             encoder_weights_path = None
 
     model = DeepLabV3Plus(
-        encoder_name=STAGE2_CONFIG['encoder_name'],
         num_classes=NUM_CLASSES,
-        encoder_pretrained=(STAGE2_CONFIG['encoder_weights'] == 'imagenet'),
-        encoder_weights_path=encoder_weights_path,
+        pretrained=True
     )
-
     # Count parameters
     total_params = sum(p.numel() for p in model.parameters())
     trainable_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
