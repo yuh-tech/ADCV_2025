@@ -5,7 +5,7 @@ from torchvision.models import mobilenet_v2
 
 
 # ---------------------------
-# ASPP (giữ nguyên tên)
+# ASPP
 # ---------------------------
 class ASPP(nn.Module):
     def __init__(self, in_channels, out_channels, rates=[6, 12, 18]):
@@ -13,6 +13,7 @@ class ASPP(nn.Module):
 
         self.blocks = nn.ModuleList()
 
+        # 1x1 conv
         self.blocks.append(
             nn.Sequential(
                 nn.Conv2d(in_channels, out_channels, 1, bias=False),
@@ -21,6 +22,7 @@ class ASPP(nn.Module):
             )
         )
 
+        # Atrous convs
         for r in rates:
             self.blocks.append(
                 nn.Sequential(
@@ -31,6 +33,7 @@ class ASPP(nn.Module):
                 )
             )
 
+        # Image pooling
         self.image_pool = nn.Sequential(
             nn.AdaptiveAvgPool2d(1),
             nn.Conv2d(in_channels, out_channels, 1, bias=False),
@@ -38,6 +41,7 @@ class ASPP(nn.Module):
             nn.ReLU(inplace=True)
         )
 
+        # Projection
         self.project = nn.Sequential(
             nn.Conv2d(out_channels * (len(rates) + 2), out_channels, 1, bias=False),
             nn.BatchNorm2d(out_channels),
@@ -59,7 +63,7 @@ class ASPP(nn.Module):
 
 
 # ---------------------------
-# DecoderBlock (giữ nguyên tên)
+# DecoderBlock
 # ---------------------------
 class DecoderBlock(nn.Module):
     def __init__(self, in_channels, skip_channels, out_channels):
@@ -85,29 +89,36 @@ class DecoderBlock(nn.Module):
 
 
 # ---------------------------
-# DeepLabV3Plus (giữ nguyên tên)
+# DeepLabV3Plus with MobileNetV2
 # ---------------------------
 class DeepLabV3Plus(nn.Module):
     def __init__(self, num_classes=21, pretrained=True):
         super().__init__()
 
+        # MobileNetV2 backbone
         backbone = mobilenet_v2(pretrained=pretrained)
 
-        self.low_level = backbone.features[0:3]     # stride /4
-        self.high_level = backbone.features[3:]     # stride /16
+        # Low-level features: stride /4
+        self.low_level = backbone.features[0:3]
+        # High-level features: stride /16
+        self.high_level = backbone.features[3:]
 
-        self.low_level_channels = 24
-        self.high_level_channels = 960
+        # Channel numbers
+        self.low_level_channels = 24    # output of features[2]
+        self.high_level_channels = 1280 # output of last conv layer
 
+        # Reduce low-level features
         self.low_reduce = nn.Sequential(
             nn.Conv2d(self.low_level_channels, 48, 1, bias=False),
             nn.BatchNorm2d(48),
             nn.ReLU(inplace=True)
         )
 
+        # ASPP + Decoder
         self.aspp = ASPP(self.high_level_channels, 256)
         self.decoder = DecoderBlock(256, 48, 256)
 
+        # Final classifier
         self.classifier = nn.Conv2d(256, num_classes, 1)
 
     def forward(self, x):
