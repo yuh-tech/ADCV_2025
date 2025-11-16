@@ -123,7 +123,9 @@ class BigEarthNetSegmentationDataset(Dataset):
             if self.transform:
                 transformed = self.transform(image=rgb, mask=mask)
                 rgb = transformed['image']
+                rgb = torch.from_numpy(rgb).permute(2, 0, 1).float()
                 mask = transformed['mask']
+                mask = torch.from_numpy(mask).long()
             else:
                 # Convert to tensors if no transform is provided
                 rgb = torch.from_numpy(rgb).permute(2, 0, 1).float()
