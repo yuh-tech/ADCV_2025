@@ -1,12 +1,12 @@
 """
 Stage 2: Train DeepLabV3+ with BigEarthNet for Semantic Segmentation
 
-This script trains a DeepLabV3+ model (MobileNetV3 backbone) on the BigEarthNet dataset.
+This script trains a DeepLabV3+ model (MobileNetV2 backbone) on the BigEarthNet dataset.
 
 NOTE:
-- The DeepLabV3Plus class implemented in src/models/deeplabv3plus.py uses MobileNetV3 backbone.
-- Stage 1 encoder checkpoints (ResNet) cannot be loaded into MobileNetV3; if STAGE2_CONFIG['encoder_weights']=='stage1'
-  the script will log a warning and continue using ImageNet pretrained MobileNetV3 (or random init).
+- The DeepLabV3Plus class implemented in src/models/deeplabv3plus.py uses MobileNetV2 backbone.
+- Stage 1 encoder checkpoints (ResNet) cannot be loaded into MobileNetV2; if STAGE2_CONFIG['encoder_weights']=='stage1'
+  the script will log a warning and continue using ImageNet pretrained MobileNetV2 (or random init).
 """
 
 import torch
@@ -62,7 +62,6 @@ def _get_encoder_and_decoder_param_lists(model):
     encoder_params = []
     decoder_params = []
 
-    # attempt detection of MobileNetV3-style attributes
     if hasattr(model, 'low_level') and hasattr(model, 'high_level'):
         # collect encoder params
         for p in model.low_level.parameters():
@@ -89,7 +88,6 @@ def create_optimizer(model, config):
     """
     encoder_params, decoder_params = _get_encoder_and_decoder_param_lists(model)
 
-    # If encoder/decoder split exists and config contains lr for both, create groups
     if encoder_params and 'encoder_lr' in config and 'decoder_lr' in config:
         param_groups = [
             {'params': encoder_params, 'lr': config['encoder_lr']},
@@ -221,17 +219,17 @@ def main(args=None):
         return
 
     # Create model
-    logger.info(f"Creating DeepLabV3+ model (MobileNetV3 backbone).")
+    logger.info(f"Creating DeepLabV3+ model (MobileNetV2 backbone).")
     encoder_weights_path = None
     if STAGE2_CONFIG.get('encoder_weights', 'imagenet') == 'stage1':
         encoder_weights_path = CHECKPOINTS_DIR / "stage1" / "encoder_pretrained.pth"
         if not encoder_weights_path.exists():
             logger.warning(
-                f"Stage 1 weights not found at: {encoder_weights_path}. Will use ImageNet pretrained MobileNetV3 (if requested).")
+                f"Stage 1 weights not found at: {encoder_weights_path}. Will use ImageNet pretrained MobileNetV2 (if requested).")
             encoder_weights_path = None
         else:
             logger.warning("Stage1 encoder weights are for a different backbone (ResNet). "
-                           "They cannot be safely loaded into MobileNetV3. Skipping.")
+                           "They cannot be safely loaded into MobileNetV2. Skipping.")
 
     # Instantiate model: only supports pretrained flag in this implementation
     model = DeepLabV3Plus(
