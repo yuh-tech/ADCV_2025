@@ -57,9 +57,12 @@ def create_encoder(
         feature_dim = encoder.classifier[1].in_features
         encoder.classifier = nn.Identity()
 
+
     elif 'mobilenet_v3' in model_name:
         encoder = models.mobilenet_v3_large(pretrained=pretrained)
-        feature_dim = encoder.classifier[1].in_features
+        # Lấy Linear cuối cùng trong classifier để lấy in_features
+        linear_layer = next(l for l in reversed(encoder.classifier) if isinstance(l, nn.Linear))
+        feature_dim = linear_layer.in_features
         encoder.classifier = nn.Identity()
         
     else:
