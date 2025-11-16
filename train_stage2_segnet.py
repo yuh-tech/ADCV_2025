@@ -130,6 +130,23 @@ def main(args=None):
     set_seed(SEED)
     logger.info(f"Random seed set to {SEED}")
     
+    # Log GPU information
+    logger.info("\n" + "-"*70)
+    logger.info("GPU Information")
+    logger.info("-"*70)
+    logger.info(f"CUDA available: {torch.cuda.is_available()}")
+    logger.info(f"Device: {DEVICE}")
+    if torch.cuda.is_available():
+        logger.info(f"GPU count: {torch.cuda.device_count()}")
+        logger.info(f"Current GPU: {torch.cuda.current_device()}")
+        logger.info(f"GPU name: {torch.cuda.get_device_name(0)}")
+        gpu_memory = torch.cuda.get_device_properties(0).total_memory / (1024**3)
+        logger.info(f"GPU memory: {gpu_memory:.2f} GB")
+        logger.info("✅ Training will use GPU")
+    else:
+        logger.warning("⚠️  CUDA not available. Training will use CPU (very slow!)")
+        logger.warning("   Consider enabling GPU in Kaggle notebook settings")
+    
     # Check if BigEarthNet data exists
     if not METADATA_PATH.exists():
         logger.error(f"Metadata file not found at {METADATA_PATH}")
