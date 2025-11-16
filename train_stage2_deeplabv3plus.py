@@ -1,11 +1,12 @@
 """
 Stage 2: Train DeepLabV3+ with BigEarthNet for Semantic Segmentation
 
-This script trains a DeepLabV3+ model with pre-trained encoder from Stage 1
-on the BigEarthNet dataset for semantic segmentation.
+This script trains a DeepLabV3+ model (MobileNetV3 backbone) on the BigEarthNet dataset.
 
-IMPORTANT: This script uses DeepLabV3+ architecture from src/models/deeplabv3plus.py
-Specifically: DeepLabV3PlusWithPretrainedEncoder class
+NOTE:
+- The DeepLabV3Plus class implemented in src/models/deeplabv3plus.py uses MobileNetV3 backbone.
+- Stage 1 encoder checkpoints (ResNet) cannot be loaded into MobileNetV3; if STAGE2_CONFIG['encoder_weights']=='stage1'
+  the script will log a warning and continue using ImageNet pretrained MobileNetV3 (or random init).
 """
 
 import torch
@@ -13,6 +14,7 @@ import numpy as np
 import random
 from pathlib import Path
 import argparse
+import logging
 
 from config import (
     METADATA_PATH, BIGEARTHNET_FOLDERS, REFERENCE_MAPS_FOLDER,
@@ -51,65 +53,111 @@ def set_seed(seed: int = 42):
     torch.backends.cudnn.benchmark = False
 
 
-def create_optimizer(model, config):
-    """Create optimizer with different learning rates for encoder and decoder."""
-    encoder_params = list(model.get_encoder_parameters())
-    decoder_params = list(model.get_decoder_parameters())
+def _get_encoder_and_decoder_param_lists(model):
+    """
+    Return (encoder_params, decoder_params) lists.
+    We treat `model.low_level` and `model.high_level` as encoder if present.
+    Otherwise, fallback: encoder_params = [], decoder_params = all params.
+    """
+    encoder_params = []
+    decoder_params = []
 
-    param_groups = [
-        {'params': encoder_params, 'lr': config['encoder_lr']},
-        {'params': decoder_params, 'lr': config['decoder_lr']},
-    ]
+    # attempt detection of MobileNetV3-style attributes
+    if hasattr(model, 'low_level') and hasattr(model, 'high_level'):
+        # collect encoder params
+        for p in model.low_level.parameters():
+            encoder_params.append(p)
+        for p in model.high_level.parameters():
+            encoder_params.append(p)
 
-    if config['optimizer'] == 'adam':
-        optimizer = torch.optim.Adam(
-            param_groups,
-            weight_decay=config['weight_decay']
-        )
-    elif config['optimizer'] == 'adamw':
-        optimizer = torch.optim.AdamW(
-            param_groups,
-            weight_decay=config['weight_decay'],
-            betas=config['betas']
-        )
-    elif config['optimizer'] == 'sgd':
-        optimizer = torch.optim.SGD(
-            param_groups,
-            weight_decay=config['weight_decay'],
-            momentum=0.9
-        )
+        # decoder = all remaining parameters
+        encoder_set = set([id(p) for p in encoder_params])
+        for p in model.parameters():
+            if id(p) not in encoder_set:
+                decoder_params.append(p)
     else:
-        raise ValueError(f"Unknown optimizer: {config['optimizer']}")
+        # fallback: no encoder/decoder split
+        decoder_params = list(model.parameters())
+
+    return encoder_params, decoder_params
+
+
+def create_optimizer(model, config):
+    """
+    Create optimizer. If encoder/decoder lr specified and model exposes encoder parts,
+    create two param groups; otherwise use single group.
+    """
+    encoder_params, decoder_params = _get_encoder_and_decoder_param_lists(model)
+
+    # If encoder/decoder split exists and config contains lr for both, create groups
+    if encoder_params and 'encoder_lr' in config and 'decoder_lr' in config:
+        param_groups = [
+            {'params': encoder_params, 'lr': config['encoder_lr']},
+            {'params': decoder_params, 'lr': config['decoder_lr']},
+        ]
+    else:
+        param_groups = [{'params': decoder_params, 'lr': config.get('learning_rate', 1e-3)}]
+
+    opt_name = config.get('optimizer', 'adam').lower()
+    if opt_name == 'adam':
+        optimizer = torch.optim.Adam(param_groups, weight_decay=config.get('weight_decay', 1e-4))
+    elif opt_name == 'adamw':
+        optimizer = torch.optim.AdamW(param_groups, weight_decay=config.get('weight_decay', 1e-4),
+                                      betas=config.get('betas', (0.9, 0.999)))
+    elif opt_name == 'sgd':
+        optimizer = torch.optim.SGD(param_groups, momentum=config.get('momentum', 0.9),
+                                    weight_decay=config.get('weight_decay', 1e-4))
+    else:
+        raise ValueError(f"Unknown optimizer: {opt_name}")
 
     return optimizer
 
 
 def create_scheduler(optimizer, config):
     """Create learning rate scheduler based on configuration."""
-    if config['scheduler'] == 'cosine':
+    sched = config.get('scheduler', None)
+    if sched == 'cosine':
         scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
-            optimizer,
-            T_max=config['num_epochs'],
-            eta_min=config['min_lr']
+            optimizer, T_max=config.get('num_epochs', 100), eta_min=config.get('min_lr', 1e-6)
         )
-    elif config['scheduler'] == 'step':
-        scheduler = torch.optim.lr_scheduler.StepLR(
-            optimizer,
-            step_size=15,
-            gamma=0.5
-        )
-    elif config['scheduler'] == 'plateau':
+    elif sched == 'step':
+        scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=config.get('step_size', 15),
+                                                    gamma=config.get('step_gamma', 0.5))
+    elif sched == 'plateau':
         scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
-            optimizer,
-            mode='max',
-            factor=0.5,
-            patience=5,
-            min_lr=config['min_lr']
+            optimizer, mode='max', factor=config.get('plateau_factor', 0.5),
+            patience=config.get('plateau_patience', 5), min_lr=config.get('min_lr', 1e-6)
         )
     else:
         scheduler = None
 
     return scheduler
+
+
+def freeze_encoder_weights(model):
+    """Set requires_grad=False for encoder parameters (if detected)."""
+    if hasattr(model, 'low_level') and hasattr(model, 'high_level'):
+        for p in model.low_level.parameters():
+            p.requires_grad = False
+        for p in model.high_level.parameters():
+            p.requires_grad = False
+        logging.getLogger(__name__).info("Encoder parameters frozen.")
+    else:
+        logging.getLogger(__name__).warning(
+            "Model does not expose low_level/high_level attributes; cannot freeze encoder.")
+
+
+def unfreeze_encoder_weights(model):
+    """Set requires_grad=True for encoder parameters (if detected)."""
+    if hasattr(model, 'low_level') and hasattr(model, 'high_level'):
+        for p in model.low_level.parameters():
+            p.requires_grad = True
+        for p in model.high_level.parameters():
+            p.requires_grad = True
+        logging.getLogger(__name__).info("Encoder parameters unfrozen.")
+    else:
+        logging.getLogger(__name__).warning(
+            "Model does not expose low_level/high_level attributes; cannot unfreeze encoder.")
 
 
 def main(args=None):
@@ -118,9 +166,11 @@ def main(args=None):
         class DefaultArgs:
             max_samples = None
             num_workers = None
+
         args = DefaultArgs()
 
     # Setup logger
+    LOGS_DIR.mkdir(parents=True, exist_ok=True)
     log_file = LOGS_DIR / 'stage2_deeplabv3plus_training.log'
     logger = setup_logger('stage2_deeplabv3plus', log_file, 'INFO')
 
@@ -145,13 +195,13 @@ def main(args=None):
     logger.info("Creating data augmentation pipelines...")
     train_transform = get_segmentation_train_augmentation(
         input_size=STAGE2_CONFIG['input_size'],
-        strength=STAGE2_CONFIG['augmentation_strength']
+        strength=STAGE2_CONFIG.get('augmentation_strength', 1.0)
     )
     val_transform = get_val_augmentation(input_size=STAGE2_CONFIG['input_size'])
 
     # Create dataloaders
     logger.info("Loading BigEarthNet dataset...")
-    num_workers = args.num_workers if args.num_workers is not None else DATALOADER_CONFIG['num_workers']
+    num_workers = args.num_workers if args.num_workers is not None else DATALOADER_CONFIG.get('num_workers', 4)
 
     try:
         train_loader, val_loader, test_loader = create_bigearthnet_dataloaders(
@@ -163,34 +213,45 @@ def main(args=None):
             val_transform=val_transform,
             batch_size=STAGE2_CONFIG['batch_size'],
             num_workers=num_workers,
-            pin_memory=DATALOADER_CONFIG['pin_memory'],
+            pin_memory=DATALOADER_CONFIG.get('pin_memory', True),
             num_classes=NUM_CLASSES,
         )
     except Exception as e:
-        logger.error(f"Error loading dataset: {e}")
+        logger.exception(f"Error loading dataset: {e}")
         return
 
     # Create model
-    logger.info(f"Creating DeepLabV3+ model with encoder: {STAGE2_CONFIG['encoder_name']}")
-
+    logger.info(f"Creating DeepLabV3+ model (MobileNetV3 backbone).")
     encoder_weights_path = None
-    if STAGE2_CONFIG['encoder_weights'] == 'stage1':
+    if STAGE2_CONFIG.get('encoder_weights', 'imagenet') == 'stage1':
         encoder_weights_path = CHECKPOINTS_DIR / "stage1" / "encoder_pretrained.pth"
-
         if not encoder_weights_path.exists():
-            logger.warning(f"Stage 1 weights not found at: {encoder_weights_path}")
+            logger.warning(
+                f"Stage 1 weights not found at: {encoder_weights_path}. Will use ImageNet pretrained MobileNetV3 (if requested).")
             encoder_weights_path = None
+        else:
+            logger.warning("Stage1 encoder weights are for a different backbone (ResNet). "
+                           "They cannot be safely loaded into MobileNetV3. Skipping.")
 
+    # Instantiate model: only supports pretrained flag in this implementation
     model = DeepLabV3Plus(
         num_classes=NUM_CLASSES,
-        pretrained=True
+        pretrained=(STAGE2_CONFIG.get('encoder_weights', 'imagenet') == 'imagenet')
     )
+    model = model.to(DEVICE)
+
     # Count parameters
     total_params = sum(p.numel() for p in model.parameters())
     trainable_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
-
     logger.info(f"Total parameters: {total_params:,}")
     logger.info(f"Trainable parameters: {trainable_params:,}")
+
+    # If freeze phase specified, freeze encoder parameters before first fit
+    freeze_epochs = STAGE2_CONFIG.get('freeze_encoder_epochs', 0)
+    if freeze_epochs > 0:
+        freeze_encoder_weights(model)
+    else:
+        logger.info("No encoder freezing requested (freeze_encoder_epochs <= 0).")
 
     # Optimizer & Scheduler
     logger.info("Creating optimizer & scheduler...")
@@ -199,13 +260,13 @@ def main(args=None):
 
     # Loss
     criterion = create_loss_function(
-        loss_type=STAGE2_CONFIG['loss_type'],
+        loss_type=STAGE2_CONFIG.get('loss_type', 'ce'),
         num_classes=NUM_CLASSES,
         class_weights=None,
-        ce_weight=STAGE2_CONFIG['ce_weight'],
-        dice_weight=STAGE2_CONFIG['dice_weight'],
-        focal_alpha=STAGE2_CONFIG['focal_alpha'],
-        focal_gamma=STAGE2_CONFIG['focal_gamma'],
+        ce_weight=STAGE2_CONFIG.get('ce_weight', 1.0),
+        dice_weight=STAGE2_CONFIG.get('dice_weight', 0.0),
+        focal_alpha=STAGE2_CONFIG.get('focal_alpha', 0.25),
+        focal_gamma=STAGE2_CONFIG.get('focal_gamma', 2.0),
         device=DEVICE
     )
 
@@ -220,8 +281,8 @@ def main(args=None):
         optimizer=optimizer,
         scheduler=scheduler,
         device=DEVICE,
-        mixed_precision=STAGE2_CONFIG['mixed_precision'],
-        gradient_accumulation_steps=STAGE2_CONFIG['gradient_accumulation_steps'],
+        mixed_precision=STAGE2_CONFIG.get('mixed_precision', False),
+        gradient_accumulation_steps=STAGE2_CONFIG.get('gradient_accumulation_steps', 1),
         checkpoint_dir=ckpt_dir,
         task="segmentation"
     )
@@ -229,28 +290,28 @@ def main(args=None):
     # ============================
     # Phase 2.1 — Freeze encoder
     # ============================
-    if STAGE2_CONFIG['freeze_encoder_epochs'] > 0:
-        logger.info("\n" + "="*70)
-        logger.info(f"Phase 2.1: Training decoder with frozen encoder ({STAGE2_CONFIG['freeze_encoder_epochs']} epochs)")
-        logger.info("="*70)
+    if freeze_epochs > 0:
+        logger.info("\n" + "=" * 70)
+        logger.info(f"Phase 2.1: Training decoder with frozen encoder ({freeze_epochs} epochs)")
+        logger.info("=" * 70)
 
         trainer.fit(
             train_loader=train_loader,
             val_loader=val_loader,
-            num_epochs=STAGE2_CONFIG['freeze_encoder_epochs'],
+            num_epochs=freeze_epochs,
             metrics_class=SegmentationMetrics,
             num_classes=NUM_CLASSES,
             class_names=CLASS_NAMES,
-            log_interval=50,
+            log_interval=STAGE2_CONFIG.get('log_interval', 50),
             save_best_only=True,
-            checkpoint_metric=STAGE2_CONFIG['checkpoint_metric']
+            checkpoint_metric=STAGE2_CONFIG.get('checkpoint_metric', 'loss')
         )
 
-        # Unfreeze
-        logger.info("Unfreezing encoder...")
-        model.unfreeze_encoder()
+        # Unfreeze encoder for fine-tuning
+        logger.info("Unfreezing encoder for fine-tuning...")
+        unfreeze_encoder_weights(model)
 
-        # Re-create optimizer/scheduler
+        # Re-create optimizer & scheduler to pick up newly trainable params
         optimizer = create_optimizer(model, STAGE2_CONFIG)
         scheduler = create_scheduler(optimizer, STAGE2_CONFIG)
         trainer.optimizer = optimizer
@@ -259,42 +320,48 @@ def main(args=None):
     # ============================
     # Phase 2.2 — Fine-tune
     # ============================
-    logger.info("\n" + "="*70)
+    logger.info("\n" + "=" * 70)
     logger.info("Phase 2.2: Fine-tuning entire DeepLabV3+")
-    logger.info("="*70)
+    logger.info("=" * 70)
 
-    ft_epochs = STAGE2_CONFIG['num_epochs'] - STAGE2_CONFIG['freeze_encoder_epochs']
+    ft_epochs = STAGE2_CONFIG.get('num_epochs', 100) - freeze_epochs
+    ft_epochs = max(0, ft_epochs)
 
-    trainer.fit(
-        train_loader=train_loader,
-        val_loader=val_loader,
-        num_epochs=ft_epochs,
-        metrics_class=SegmentationMetrics,
-        num_classes=NUM_CLASSES,
-        class_names=CLASS_NAMES,
-        log_interval=50,
-        save_best_only=STAGE2_CONFIG['save_best_only'],
-        early_stopping_patience=STAGE2_CONFIG['early_stopping_patience'],
-        checkpoint_metric=STAGE2_CONFIG['checkpoint_metric']
-    )
+    if ft_epochs > 0:
+        trainer.fit(
+            train_loader=train_loader,
+            val_loader=val_loader,
+            num_epochs=ft_epochs,
+            metrics_class=SegmentationMetrics,
+            num_classes=NUM_CLASSES,
+            class_names=CLASS_NAMES,
+            log_interval=STAGE2_CONFIG.get('log_interval', 50),
+            save_best_only=STAGE2_CONFIG.get('save_best_only', True),
+            early_stopping_patience=STAGE2_CONFIG.get('early_stopping_patience', None),
+            checkpoint_metric=STAGE2_CONFIG.get('checkpoint_metric', 'loss')
+        )
+    else:
+        logger.info("Fine-tuning epochs <= 0, skipping Phase 2.2.")
 
     # ============================
     # Final Test Evaluation
     # ============================
-    logger.info("\n" + "="*70)
+    logger.info("\n" + "=" * 70)
     logger.info("Evaluating on test set...")
-    logger.info("="*70)
+    logger.info("=" * 70)
 
     best_ckpt = ckpt_dir / "best_model.pth"
     if best_ckpt.exists():
         trainer.load_checkpoint(best_ckpt, load_optimizer=False)
+    else:
+        logger.warning("Best checkpoint not found; evaluating current model state.")
 
     test_metric_obj = SegmentationMetrics(NUM_CLASSES, CLASS_NAMES)
     test_metrics = trainer.validate(test_loader, test_metric_obj)
 
-    logger.info(f"  Test Loss: {test_metrics['loss']:.4f}")
-    logger.info(f"  Test mIoU: {test_metrics['mean_iou']:.4f}")
-    logger.info(f"  Test Pixel Accuracy: {test_metrics['pixel_accuracy']:.4f}")
+    logger.info(f"  Test Loss: {test_metrics.get('loss', 0):.4f}")
+    logger.info(f"  Test mIoU: {test_metrics.get('mean_iou', 0):.4f}")
+    logger.info(f"  Test Pixel Accuracy: {test_metrics.get('pixel_accuracy', 0):.4f}")
 
     test_metric_obj.print_metrics()
 
@@ -329,8 +396,7 @@ def main(args=None):
 
     logger.info("\nStage 2 DeepLabV3+ training completed successfully!")
     logger.info(f"Best checkpoint saved at: {best_ckpt}")
-    logger.info("="*70)
-
+    logger.info("=" * 70)
 
 
 if __name__ == "__main__":
@@ -346,14 +412,14 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
-    # Override config
+    # Override config if provided
     if args.batch_size:
         STAGE2_CONFIG['batch_size'] = args.batch_size
     if args.epochs:
         STAGE2_CONFIG['num_epochs'] = args.epochs
-    if args.encoder_lr:
+    if args.encoder_lr is not None:
         STAGE2_CONFIG['encoder_lr'] = args.encoder_lr
-    if args.decoder_lr:
+    if args.decoder_lr is not None:
         STAGE2_CONFIG['decoder_lr'] = args.decoder_lr
     if args.freeze_epochs is not None:
         STAGE2_CONFIG['freeze_encoder_epochs'] = args.freeze_epochs
