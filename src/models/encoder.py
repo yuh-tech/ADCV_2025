@@ -56,6 +56,11 @@ def create_encoder(
         encoder = models.mobilenet_v2(pretrained=pretrained)
         feature_dim = encoder.classifier[1].in_features
         encoder.classifier = nn.Identity()
+
+    elif 'mobilenet_v3' in model_name:
+        encoder = models.mobilenet_v3_large(pretrained=pretrained)
+        feature_dim = encoder.classifier[1].in_features
+        encoder.classifier = nn.Identity()
         
     else:
         raise ValueError(f"Unsupported model: {model_name}")
