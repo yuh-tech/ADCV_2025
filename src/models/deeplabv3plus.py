@@ -1,170 +1,146 @@
-"""
-DeepLabV3+ architecture for semantic segmentation
-"""
-
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from typing import Optional
-import logging
-
-from .encoder import FeatureExtractor  # Pre-trained backbone encoder
-
-logger = logging.getLogger(__name__)
+from torchvision.models import mobilenet_v3_large
 
 
+# ---------------------------
+# ASPP (giữ nguyên tên)
+# ---------------------------
 class ASPP(nn.Module):
-    """Atrous Spatial Pyramid Pooling module used in DeepLabV3+."""
+    def __init__(self, in_channels, out_channels, rates=[6, 12, 18]):
+        super().__init__()
 
-    def __init__(self, in_channels: int, out_channels: int, atrous_rates: list = [6, 12, 18]):
-        super(ASPP, self).__init__()
-        self.branches = nn.ModuleList()
+        self.blocks = nn.ModuleList()
 
-        # 1x1 convolution
-        self.branches.append(nn.Sequential(
-            nn.Conv2d(in_channels, out_channels, kernel_size=1, bias=False),
-            nn.BatchNorm2d(out_channels),
-            nn.ReLU(inplace=True)
-        ))
-
-        # 3x3 convolutions with different dilation rates
-        for rate in atrous_rates:
-            self.branches.append(nn.Sequential(
-                nn.Conv2d(in_channels, out_channels, kernel_size=3, padding=rate, dilation=rate, bias=False),
+        # 1x1 conv
+        self.blocks.append(
+            nn.Sequential(
+                nn.Conv2d(in_channels, out_channels, 1, bias=False),
                 nn.BatchNorm2d(out_channels),
                 nn.ReLU(inplace=True)
-            ))
+            )
+        )
 
-        # Image pooling branch
-        self.global_pool = nn.Sequential(
+        # Dilated conv
+        for r in rates:
+            self.blocks.append(
+                nn.Sequential(
+                    nn.Conv2d(in_channels, out_channels, 3,
+                              padding=r, dilation=r, bias=False),
+                    nn.BatchNorm2d(out_channels),
+                    nn.ReLU(inplace=True)
+                )
+            )
+
+        # Image pooling
+        self.image_pool = nn.Sequential(
             nn.AdaptiveAvgPool2d(1),
-            nn.Conv2d(in_channels, out_channels, kernel_size=1, bias=False),
+            nn.Conv2d(in_channels, out_channels, 1, bias=False),
             nn.BatchNorm2d(out_channels),
             nn.ReLU(inplace=True)
         )
 
-        # Final projection
+        # Projection
         self.project = nn.Sequential(
-            nn.Conv2d(out_channels * (len(atrous_rates) + 2), out_channels, kernel_size=1, bias=False),
+            nn.Conv2d(out_channels * (len(rates) + 2), out_channels, 1, bias=False),
             nn.BatchNorm2d(out_channels),
             nn.ReLU(inplace=True),
             nn.Dropout2d(0.1)
         )
 
     def forward(self, x):
-        size = x.shape[2:]
-        res = [branch(x) for branch in self.branches]
-        gp = self.global_pool(x)
-        gp = F.interpolate(gp, size=size, mode='bilinear', align_corners=False)
-        res.append(gp)
-        res = torch.cat(res, dim=1)
-        return self.project(res)
+        h, w = x.shape[2:]
+        res = [blk(x) for blk in self.blocks]
+
+        img = self.image_pool(x)
+        img = F.interpolate(img, size=(h, w), mode="bilinear", align_corners=False)
+        res.append(img)
+
+        out = torch.cat(res, dim=1)
+        return self.project(out)
 
 
+# ---------------------------
+# DecoderBlock (giữ nguyên tên)
+# ---------------------------
 class DecoderBlock(nn.Module):
-    """Decoder block for DeepLabV3+."""
+    def __init__(self, in_channels, skip_channels, out_channels):
+        super().__init__()
 
-    def __init__(self, in_channels: int, skip_channels: int, out_channels: int):
-        super(DecoderBlock, self).__init__()
-        self.conv1 = nn.Conv2d(in_channels + skip_channels, out_channels, kernel_size=3, padding=1, bias=False)
-        self.bn1 = nn.BatchNorm2d(out_channels)
-        self.relu1 = nn.ReLU(inplace=True)
-
-        self.conv2 = nn.Conv2d(out_channels, out_channels, kernel_size=3, padding=1, bias=False)
-        self.bn2 = nn.BatchNorm2d(out_channels)
-        self.relu2 = nn.ReLU(inplace=True)
-
-    def forward(self, x, skip):
-        # Upsample
-        x = F.interpolate(x, size=skip.shape[2:], mode='bilinear', align_corners=False)
-        x = torch.cat([x, skip], dim=1)
-        x = self.conv1(x)
-        x = self.bn1(x)
-        x = self.relu1(x)
-        x = self.conv2(x)
-        x = self.bn2(x)
-        x = self.relu2(x)
-        return x
-
-
-class DeepLabV3Plus(nn.Module):
-    """
-    DeepLabV3+ for semantic segmentation with optional pre-trained encoder.
-    """
-
-    def __init__(
-        self,
-        encoder_name: str = 'resnet50',
-        num_classes: int = 21,
-        encoder_pretrained: bool = True,
-        encoder_weights_path: Optional[str] = None,
-        atrous_rates: list = [6, 12, 18],
-        low_level_channels: int = 256
-    ):
-        super(DeepLabV3Plus, self).__init__()
-
-        # Encoder
-        self.encoder = FeatureExtractor(encoder_name, encoder_pretrained)
-        feature_dims = self.encoder.get_feature_dims()  # e.g., [64, 256, 512, 1024, 2048]
-
-        if encoder_weights_path:
-            self.load_encoder_weights(encoder_weights_path)
-
-        # ASPP module
-        self.aspp = ASPP(feature_dims[-1], 256, atrous_rates)
-
-        # Decoder
-        self.low_level_conv = nn.Sequential(
-            nn.Conv2d(feature_dims[1], low_level_channels, kernel_size=1, bias=False),
-            nn.BatchNorm2d(low_level_channels),
+        self.conv1 = nn.Sequential(
+            nn.Conv2d(in_channels + skip_channels, out_channels, 3, padding=1, bias=False),
+            nn.BatchNorm2d(out_channels),
             nn.ReLU(inplace=True)
         )
-        self.decoder = DecoderBlock(256, low_level_channels, 256)
 
-        # Final classification
-        self.classifier = nn.Conv2d(256, num_classes, kernel_size=1)
+        self.conv2 = nn.Sequential(
+            nn.Conv2d(out_channels, out_channels, 3, padding=1, bias=False),
+            nn.BatchNorm2d(out_channels),
+            nn.ReLU(inplace=True)
+        )
 
-        logger.info(f"Initialized DeepLabV3Plus: {encoder_name}, classes={num_classes}")
-        logger.info(f"Feature dimensions: {feature_dims}")
+    def forward(self, x, skip):
+        x = F.interpolate(x, size=skip.shape[2:], mode="bilinear", align_corners=False)
+        x = torch.cat([x, skip], dim=1)
+        x = self.conv1(x)
+        return self.conv2(x)
+
+
+# ---------------------------
+# DeepLabV3Plus (giữ nguyên tên)
+# ---------------------------
+class DeepLabV3Plus(nn.Module):
+    def __init__(self, num_classes=21, pretrained=True):
+        super().__init__()
+
+        # -----------------------
+        # MobileNetV3 backbone
+        # -----------------------
+        backbone = mobilenet_v3_large(pretrained=pretrained)
+
+        # Low-level feature (stride=4) → 24 channels
+        self.low_level = backbone.features[0:3]
+
+        # High-level feature (stride=16) → 960 channels
+        self.high_level = backbone.features[3:]
+
+        self.low_level_channels = 24
+        self.high_level_channels = 960
+
+        # Reduce low-level channels
+        self.low_reduce = nn.Sequential(
+            nn.Conv2d(self.low_level_channels, 48, 1, bias=False),
+            nn.BatchNorm2d(48),
+            nn.ReLU(inplace=True)
+        )
+
+        # ASPP
+        self.aspp = ASPP(self.high_level_channels, 256)
+
+        # Decoder
+        self.decoder = DecoderBlock(256, 48, 256)
+
+        # Final classifier
+        self.classifier = nn.Conv2d(256, num_classes, 1)
 
     def forward(self, x):
+        h, w = x.shape[2:]
+
         # Encoder
-        features = self.encoder(x)
-        # features = [f0, f1, f2, f3, f4] at decreasing resolutions
+        x_low = self.low_level(x)        # 1/4
+        x_high = self.high_level(x_low)  # 1/16
 
-        low_level_feat = self.low_level_conv(features[1])
-        x = self.aspp(features[-1])
-        x = self.decoder(x, low_level_feat)
+        # ASPP
+        x_aspp = self.aspp(x_high)
 
-        # Upsample to input size
-        x = F.interpolate(x, size=x.shape[2]*4, mode='bilinear', align_corners=False)  # Adjust factor based on skip resolution
-        x = self.classifier(x)
-        return x
+        # Reduce low-level
+        x_low_r = self.low_reduce(x_low)
 
-    def load_encoder_weights(self, weights_path: str):
-        """Load encoder weights from checkpoint."""
-        checkpoint = torch.load(weights_path, map_location='cpu')
-        if 'encoder_state_dict' in checkpoint:
-            state_dict = checkpoint['encoder_state_dict']
-        elif 'model_state_dict' in checkpoint:
-            state_dict = {k.replace('encoder.', ''): v for k, v in checkpoint['model_state_dict'].items() if k.startswith('encoder.')}
-        else:
-            state_dict = checkpoint
-        self.encoder.load_state_dict(state_dict, strict=False)
-        logger.info(f"Loaded encoder weights from {weights_path}")
+        # Decoder
+        x_dec = self.decoder(x_aspp, x_low_r)
 
-    def freeze_encoder(self):
-        for param in self.encoder.parameters():
-            param.requires_grad = False
-        logger.info("Encoder frozen")
+        # Upsample
+        out = F.interpolate(x_dec, size=(h, w), mode="bilinear", align_corners=False)
 
-    def unfreeze_encoder(self):
-        for param in self.encoder.parameters():
-            param.requires_grad = True
-        logger.info("Encoder unfrozen")
-
-    def get_encoder_parameters(self):
-        return self.encoder.parameters()
-
-    def get_decoder_parameters(self):
-        return [p for n, p in self.named_parameters() if not n.startswith('encoder.')]
+        return self.classifier(out)
