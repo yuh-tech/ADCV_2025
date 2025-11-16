@@ -28,7 +28,7 @@ from src.data import (
 )
 
 # Import DeepLabV3+
-from src.models.deeplabv3plus import DeepLabV3PlusWithPretrainedEncoder
+from src.models.deeplabv3plus import DeepLabV3Plus
 from src.models.losses import create_loss_function
 
 from src.utils import (
@@ -182,12 +182,11 @@ def main(args=None):
             logger.warning(f"Stage 1 weights not found at: {encoder_weights_path}")
             encoder_weights_path = None
 
-    model = DeepLabV3PlusWithPretrainedEncoder(
+    model = DeepLabV3Plus(
         encoder_name=STAGE2_CONFIG['encoder_name'],
         num_classes=NUM_CLASSES,
         encoder_pretrained=(STAGE2_CONFIG['encoder_weights'] == 'imagenet'),
         encoder_weights_path=encoder_weights_path,
-        freeze_encoder=(STAGE2_CONFIG['freeze_encoder_epochs'] > 0)
     )
 
     # Count parameters
