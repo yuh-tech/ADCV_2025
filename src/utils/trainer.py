@@ -115,6 +115,7 @@ class Trainer:
             
             if self.task == 'segmentation':
                 targets = batch['mask'].to(self.device)
+                targets = targets.long()
             else:  # classification
                 targets = batch['label'].to(self.device)
             
