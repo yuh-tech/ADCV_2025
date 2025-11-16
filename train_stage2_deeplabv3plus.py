@@ -165,7 +165,6 @@ def main(args=None):
             num_workers=num_workers,
             pin_memory=DATALOADER_CONFIG['pin_memory'],
             num_classes=NUM_CLASSES,
-            max_train_samples=args.max_samples
         )
     except Exception as e:
         logger.error(f"Error loading dataset: {e}")
