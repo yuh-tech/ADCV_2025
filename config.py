@@ -276,8 +276,8 @@ STAGE2_CONFIG = {
     
     # Dataset sampling (ĐỂ TRAIN NHANH HƠN)
     'use_subset': True,  # Sử dụng subset để test nhanh
-    'subset_fraction': 0.1,  # Chỉ dùng 10% data (có thể tăng lên sau)
-    'filter_missing_patches': True,  # Bỏ qua các patches bị lỗi
+    'subset_fraction': 0.05,  # Giảm xuống 5% để load nhanh hơn
+    'filter_missing_patches': False,  # TẮT để load nhanh - dataset sẽ handle errors
     
     # Two-phase training
     'freeze_encoder_epochs': 10,  # Phase 2.1: Train decoder only
