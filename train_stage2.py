@@ -152,7 +152,10 @@ def main(args):
             batch_size=STAGE2_CONFIG['batch_size'],
             num_workers=DATALOADER_CONFIG['num_workers'],
             pin_memory=DATALOADER_CONFIG['pin_memory'],
-            num_classes=NUM_CLASSES
+            num_classes=NUM_CLASSES,
+            use_subset=STAGE2_CONFIG.get('use_subset', False),
+            subset_fraction=STAGE2_CONFIG.get('subset_fraction', 0.1),
+            filter_missing_patches=STAGE2_CONFIG.get('filter_missing_patches', False)
         )
     except Exception as e:
         logger.error(f"Error loading BigEarthNet dataset: {e}")

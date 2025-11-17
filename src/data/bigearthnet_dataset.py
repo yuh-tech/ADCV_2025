@@ -206,7 +206,10 @@ def create_bigearthnet_dataloaders(
     batch_size: int,
     num_workers: int = 4,
     pin_memory: bool = True,
-    num_classes: int = 10
+    num_classes: int = 10,
+    use_subset: bool = False,
+    subset_fraction: float = 0.1,
+    filter_missing_patches: bool = False
 ):
     """
     Create train, validation, and test dataloaders for BigEarthNet.
@@ -222,6 +225,9 @@ def create_bigearthnet_dataloaders(
         num_workers: Number of data loading workers
         pin_memory: Pin memory for faster GPU transfer
         num_classes: Number of classes
+        use_subset: If True, use only a fraction of the data for faster training
+        subset_fraction: Fraction of data to use when use_subset=True
+        filter_missing_patches: If True, pre-filter patches that don't exist
         
     Returns:
         Tuple of (train_loader, val_loader, test_loader)
@@ -235,9 +241,46 @@ def create_bigearthnet_dataloaders(
     val_df = metadata_df[metadata_df['split'] == 'validation'].reset_index(drop=True)
     test_df = metadata_df[metadata_df['split'] == 'test'].reset_index(drop=True)
     
-    logger.info(f"Train samples: {len(train_df)}")
-    logger.info(f"Validation samples: {len(val_df)}")
-    logger.info(f"Test samples: {len(test_df)}")
+    logger.info(f"Train samples (original): {len(train_df)}")
+    logger.info(f"Validation samples (original): {len(val_df)}")
+    logger.info(f"Test samples (original): {len(test_df)}")
+    
+    # Apply subset if requested (FOR FAST PROTOTYPING)
+    if use_subset:
+        train_size = int(len(train_df) * subset_fraction)
+        val_size = int(len(val_df) * subset_fraction)
+        test_size = int(len(test_df) * subset_fraction)
+        
+        # Sample randomly
+        train_df = train_df.sample(n=train_size, random_state=42).reset_index(drop=True)
+        val_df = val_df.sample(n=val_size, random_state=42).reset_index(drop=True)
+        test_df = test_df.sample(n=test_size, random_state=42).reset_index(drop=True)
+        
+        logger.warning(f"⚠️ USING SUBSET MODE - Only {subset_fraction*100}% of data!")
+        logger.info(f"Train samples (subset): {len(train_df)}")
+        logger.info(f"Validation samples (subset): {len(val_df)}")
+        logger.info(f"Test samples (subset): {len(test_df)}")
+    
+    # Filter missing patches if requested (HIGHLY RECOMMENDED)
+    if filter_missing_patches:
+        logger.info("Filtering missing patches...")
+        from .utils import find_patch_folder, find_reference_map
+        
+        def check_patch_exists(patch_id):
+            try:
+                find_patch_folder(patch_id, data_folders)
+                find_reference_map(patch_id, reference_maps_folder)
+                return True
+            except:
+                return False
+        
+        train_df = train_df[train_df['patch_id'].apply(check_patch_exists)].reset_index(drop=True)
+        val_df = val_df[val_df['patch_id'].apply(check_patch_exists)].reset_index(drop=True)
+        test_df = test_df[test_df['patch_id'].apply(check_patch_exists)].reset_index(drop=True)
+        
+        logger.info(f"Train samples (after filtering): {len(train_df)}")
+        logger.info(f"Validation samples (after filtering): {len(val_df)}")
+        logger.info(f"Test samples (after filtering): {len(test_df)}")
     
     # Create datasets
     train_dataset = BigEarthNetSegmentationDataset(

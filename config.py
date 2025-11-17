@@ -260,10 +260,15 @@ STAGE2_CONFIG = {
     'num_classes': NUM_CLASSES,
     
     # Training parameters
-    'batch_size': 16,  # Reduced due to memory constraints
+    'batch_size': 32,  # Tăng từ 16 lên 32 để tăng tốc
     'num_epochs': 50,
-    'gradient_accumulation_steps': 2,  # Effective batch size = 16 * 2 = 32
+    'gradient_accumulation_steps': 1,  # Giảm xuống 1 vì đã tăng batch_size
     'mixed_precision': True,  # Use FP16 training
+    
+    # Dataset sampling (ĐỂ TRAIN NHANH HƠN)
+    'use_subset': True,  # Sử dụng subset để test nhanh
+    'subset_fraction': 0.1,  # Chỉ dùng 10% data (có thể tăng lên sau)
+    'filter_missing_patches': True,  # Bỏ qua các patches bị lỗi
     
     # Two-phase training
     'freeze_encoder_epochs': 10,  # Phase 2.1: Train decoder only
@@ -311,10 +316,10 @@ STAGE2_CONFIG = {
 # ============================================================================
 
 DATALOADER_CONFIG = {
-    'num_workers': 2,
+    'num_workers': 4,  # Tăng từ 2 lên 4 (Kaggle có 2 CPU cores, nhưng có thể dùng 4 workers)
     'pin_memory': True,
     'persistent_workers': True,
-    'prefetch_factor': 2,
+    'prefetch_factor': 4,  # Tăng từ 2 lên 4 để prefetch nhiều batch hơn
 }
 
 # ============================================================================
