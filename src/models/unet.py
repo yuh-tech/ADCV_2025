@@ -246,8 +246,24 @@ class UNetWithPretrainedEncoder(nn.Module):
         else:
             state_dict = checkpoint
         
+        # Map ResNet standard names to FeatureExtractor names
+        # In Stage 1, encoder has: conv1, bn1, layer1, layer2, etc.
+        # In Stage 2 FeatureExtractor, conv1+bn1+relu are wrapped in layer0
+        mapped_state_dict = {}
+        for key, value in state_dict.items():
+            if key == 'conv1.weight':
+                # conv1 -> layer0.0 (first child in Sequential)
+                mapped_state_dict['layer0.0.weight'] = value
+            elif key.startswith('bn1.'):
+                # bn1.* -> layer0.1.* (second child in Sequential)
+                new_key = key.replace('bn1.', 'layer0.1.')
+                mapped_state_dict[new_key] = value
+            else:
+                # Keep other keys as-is (layer1, layer2, layer3, layer4, etc.)
+                mapped_state_dict[key] = value
+        
         # Load weights
-        missing_keys, unexpected_keys = self.encoder.load_state_dict(state_dict, strict=False)
+        missing_keys, unexpected_keys = self.encoder.load_state_dict(mapped_state_dict, strict=False)
         
         if missing_keys:
             logger.warning(f"Missing keys when loading encoder: {missing_keys}")

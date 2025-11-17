@@ -5,6 +5,35 @@ Data augmentation pipelines for training and validation
 import albumentations as A
 from albumentations.pytorch import ToTensorV2
 import numpy as np
+import torch
+
+
+class ConvertMaskToLong(A.BasicTransform):
+    """
+    Custom transform to convert mask tensor from int32 to int64 (long).
+    This is needed because ToTensorV2 converts masks to int32,
+    but PyTorch's CrossEntropyLoss requires int64.
+    """
+    
+    def __init__(self, always_apply=True, p=1.0):
+        super(ConvertMaskToLong, self).__init__(always_apply, p)
+    
+    @property
+    def targets(self):
+        return {"mask": self.apply_to_mask}
+    
+    def apply(self, img, **params):
+        # Don't modify the image
+        return img
+    
+    def apply_to_mask(self, mask, **params):
+        # Convert mask to long if it's a torch tensor
+        if isinstance(mask, torch.Tensor):
+            return mask.long()
+        return mask
+    
+    def get_transform_init_args_names(self):
+        return tuple()
 
 
 def get_train_augmentation(input_size: int, strength: str = 'medium', is_segmentation: bool = True):
@@ -122,6 +151,10 @@ def get_train_augmentation(input_size: int, strength: str = 'medium', is_segment
         ToTensorV2(),
     ])
     
+    # Add mask type conversion for segmentation tasks
+    if is_segmentation:
+        augmentations.append(ConvertMaskToLong())
+    
     return A.Compose(augmentations)
 
 
@@ -143,6 +176,7 @@ def get_val_augmentation(input_size: int):
             always_apply=True
         ),
         ToTensorV2(),
+        ConvertMaskToLong(),  # Convert mask to long for CrossEntropyLoss
     ])
 
 
