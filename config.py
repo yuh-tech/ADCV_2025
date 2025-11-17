@@ -76,10 +76,15 @@ if IS_KAGGLE:
     PRETRAINED_ENCODER_PATH = STAGE1_WEIGHTS_DIR / "encoder_pretrained.pth"
     STAGE1_BEST_MODEL_PATH = STAGE1_WEIGHTS_DIR / "best_model.pth"
     
+    # BIFOLD BigEarthNet pretrained (cached by huggingface_hub)
+    BIFOLD_CACHE_DIR = KAGGLE_WORKING / "pretrained_models"
+    BIFOLD_REPO_ID = "BIFOLD-BigEarthNetv2-0/resnet50-s2-v0.2.0"
+    
     print(f"  📁 Found {len(BIGEARTHNET_FOLDERS)} BigEarthNet folders")
     print(f"  📍 Metadata: {METADATA_PATH.exists()}")
     print(f"  📍 EuroSAT: {EUROSAT_PATH.exists()}")
-    print(f"  📍 Pretrained Encoder: {PRETRAINED_ENCODER_PATH.exists() if PRETRAINED_ENCODER_PATH else False}")
+    print(f"  📍 Pretrained Encoder (Stage1): {PRETRAINED_ENCODER_PATH.exists() if PRETRAINED_ENCODER_PATH else False}")
+    print(f"  📍 BIFOLD available: Can be downloaded from HuggingFace")
     
 else:
     # Local environment
@@ -105,6 +110,10 @@ else:
     STAGE1_WEIGHTS_DIR = OUTPUTS_DIR / "stage1"
     PRETRAINED_ENCODER_PATH = STAGE1_WEIGHTS_DIR / "encoder_pretrained.pth"
     STAGE1_BEST_MODEL_PATH = STAGE1_WEIGHTS_DIR / "best_model.pth"
+    
+    # BIFOLD BigEarthNet pretrained
+    BIFOLD_CACHE_DIR = PROJECT_ROOT / "pretrained_models"
+    BIFOLD_REPO_ID = "BIFOLD-BigEarthNetv2-0/resnet50-s2-v0.2.0"
 
 # Common output directories
 CHECKPOINTS_DIR = OUTPUTS_DIR / "checkpoints"
@@ -255,7 +264,7 @@ STAGE1_CONFIG = {
 
 STAGE2_CONFIG = {
     'encoder_name': 'resnet50',  # Must match Stage 1
-    'encoder_weights': 'stage1',  # Options: 'stage1', 'imagenet', None
+    'encoder_weights': 'stage1',  # Options: 'stage1', 'bifold', 'imagenet', None
     'input_size': BIGEARTHNET_IMAGE_SIZE,
     'num_classes': NUM_CLASSES,
     

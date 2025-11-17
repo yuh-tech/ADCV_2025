@@ -16,7 +16,7 @@ from config import (
     CHECKPOINTS_DIR, LOGS_DIR, VISUALIZATIONS_DIR,
     STAGE2_CONFIG, DATALOADER_CONFIG, CLASS_NAMES, NUM_CLASSES,
     CORINE_TO_EUROSAT, DEVICE, SEED,
-    PRETRAINED_ENCODER_PATH, IS_KAGGLE
+    PRETRAINED_ENCODER_PATH, BIFOLD_REPO_ID, BIFOLD_CACHE_DIR, IS_KAGGLE
 )
 from src.data import (
     create_bigearthnet_dataloaders,
@@ -167,6 +167,8 @@ def main(args):
     
     # Determine encoder weights source
     encoder_weights_path = None
+    use_bifold = False
+    
     if STAGE2_CONFIG['encoder_weights'] == 'stage1':
         # Use pretrained encoder path from config (supports both Kaggle and local)
         if args.pretrained_encoder_path:
@@ -181,6 +183,13 @@ def main(args):
             logger.warning("Will use ImageNet pre-trained weights instead")
             encoder_weights_path = None
     
+    elif STAGE2_CONFIG['encoder_weights'] == 'bifold':
+        # Use BIFOLD BigEarthNet pretrained
+        logger.info("Will use BIFOLD BigEarthNet pretrained encoder (downloaded from HuggingFace)")
+        use_bifold = True
+        encoder_weights_path = None  # Will be loaded separately after model creation
+    
+    # Create model
     model = UNetWithPretrainedEncoder(
         encoder_name=STAGE2_CONFIG['encoder_name'],
         num_classes=NUM_CLASSES,
@@ -189,6 +198,54 @@ def main(args):
         dropout=0.1,
         freeze_encoder=(STAGE2_CONFIG['freeze_encoder_epochs'] > 0)
     )
+    
+    # Load BIFOLD weights if requested
+    if use_bifold:
+        try:
+            from huggingface_hub import hf_hub_download
+            logger.info("Downloading BIFOLD BigEarthNet pretrained weights...")
+            
+            bifold_path = hf_hub_download(
+                repo_id=BIFOLD_REPO_ID,
+                filename="pytorch_model.bin",
+                cache_dir=BIFOLD_CACHE_DIR
+            )
+            logger.info(f"Downloaded BIFOLD weights to: {bifold_path}")
+            
+            # Load BIFOLD weights into encoder
+            checkpoint = torch.load(bifold_path, map_location='cpu')
+            if isinstance(checkpoint, dict) and 'state_dict' in checkpoint:
+                state_dict = checkpoint['state_dict']
+            elif isinstance(checkpoint, dict) and 'model' in checkpoint:
+                state_dict = checkpoint['model']
+            else:
+                state_dict = checkpoint
+            
+            # Map BIFOLD keys to FeatureExtractor
+            encoder_state_dict = {}
+            for key, value in state_dict.items():
+                if 'fc' in key or 'classifier' in key:
+                    continue
+                if key == 'conv1.weight':
+                    encoder_state_dict['layer0.0.weight'] = value
+                elif key.startswith('bn1.'):
+                    encoder_state_dict[key.replace('bn1.', 'layer0.1.')] = value
+                elif any(key.startswith(f'layer{i}') for i in range(1, 5)):
+                    encoder_state_dict[key] = value
+            
+            missing, unexpected = model.encoder.load_state_dict(encoder_state_dict, strict=False)
+            logger.info(f"✅ Loaded BIFOLD pretrained encoder!")
+            if missing:
+                logger.warning(f"Missing keys: {len(missing)}")
+            if unexpected:
+                logger.warning(f"Unexpected keys: {len(unexpected)}")
+                
+        except ImportError:
+            logger.error("huggingface_hub not installed! Install: pip install huggingface_hub")
+            logger.warning("Falling back to ImageNet pretrained weights")
+        except Exception as e:
+            logger.error(f"Error loading BIFOLD weights: {e}")
+            logger.warning("Falling back to ImageNet pretrained weights")
     
     # Count parameters
     total_params = sum(p.numel() for p in model.parameters())
