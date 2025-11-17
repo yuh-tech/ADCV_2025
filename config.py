@@ -264,7 +264,7 @@ STAGE1_CONFIG = {
 
 STAGE2_CONFIG = {
     'encoder_name': 'resnet50',  # Must match Stage 1
-    'encoder_weights': 'stage1',  # Options: 'stage1', 'bifold', 'imagenet', None
+    'encoder_weights': 'bifold',  # Options: 'stage1', 'bifold', 'imagenet', None
     'input_size': BIGEARTHNET_IMAGE_SIZE,
     'num_classes': NUM_CLASSES,
     
