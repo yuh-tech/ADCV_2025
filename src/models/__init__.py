@@ -2,7 +2,7 @@
 
 from .encoder import EncoderClassifier, create_encoder
 from .unet import UNet, UNetWithPretrainedEncoder
-from .unet_pp import UNetPP
+from .unet_pp import UNetPlusPlus, UNetPlusPlusWithPretrainedEncoder
 from .losses import CombinedLoss, DiceLoss, FocalLoss
 
 __all__ = [
